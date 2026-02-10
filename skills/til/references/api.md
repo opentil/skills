@@ -215,6 +215,109 @@ When a 422 is returned, inspect the `details` array and attempt to fix:
 
 After fixing, retry the POST **once**. If the retry also returns 422, save locally and report the error.
 
+## GET /site -- Site Info
+
+Fetch the authenticated user's site details. Requires `read:entries` scope.
+
+### Response (SiteDetailSerializer)
+
+```json
+{
+  "username": "hong",
+  "title": "Hong's TIL",
+  "bio": "Learning something new every day",
+  "timezone": "Asia/Shanghai",
+  "locale": "en",
+  "entries_count": 28,
+  "published_entries_count": 15,
+  "categories_count": 3,
+  "custom_domain": null,
+  "domain_verified": false,
+  "discoverable": true,
+  "theme_slug": "default",
+  "theme_mode": "auto",
+  "last_posted_at": "2026-02-10T14:30:22Z",
+  "created_at": "2025-06-01T00:00:00Z",
+  "updated_at": "2026-02-10T14:30:22Z"
+}
+```
+
+- `entries_count`: total entries (including drafts)
+- `published_entries_count`: published entries only
+
+Used by `/til status` to display site info.
+
+## GET /tags -- List Tags
+
+List tags for the authenticated user's site. Requires `read:entries` scope.
+
+```
+GET /tags?sort=popular&per_page=20
+```
+
+| Param | Description |
+|-------|-------------|
+| `sort` | `popular` (default, by taggings count) or `alphabetical` |
+| `per_page` | Results per page (max 100, default 20) |
+| `page` | Page number |
+| `with_entries` | `true` to only return tags that have entries |
+
+### Response (TagSerializer)
+
+```json
+{
+  "data": [
+    {
+      "id": "123",
+      "name": "go",
+      "slug": "go",
+      "taggings_count": 8,
+      "created_at": "2025-06-15T10:00:00Z"
+    }
+  ],
+  "meta": {
+    "current_page": 1,
+    "total_pages": 1,
+    "total_count": 12,
+    "per_page": 20
+  }
+}
+```
+
+Note: `taggings_count` is the global usage count across all entries on the site.
+
+Used by `/til tags` to display tag usage.
+
+## GET /categories -- List Categories
+
+List categories (topics) for the authenticated user's site. Requires `read:entries` scope.
+
+```
+GET /categories
+```
+
+### Response (CategorySerializer)
+
+```json
+{
+  "data": [
+    {
+      "id": "456",
+      "name": "Backend",
+      "slug": "backend",
+      "description": "Server-side topics",
+      "entries_count": 12,
+      "position": 0,
+      "created_at": "2025-06-15T10:00:00Z"
+    }
+  ]
+}
+```
+
+Note: `entries_count` is the site-level count of entries in that category.
+
+Used by `/til categories` to display category listing.
+
 ## Rate Limits
 
 - Authenticated: 5,000 requests/hour

@@ -3,13 +3,13 @@ name: til
 description: >
   Capture and manage TIL (Today I Learned) entries on OpenTIL.
   Use /til <content> to capture, /til to extract insights from conversation,
-  or /til list|publish|edit|search|delete to manage entries -- all without
-  leaving the CLI.
+  or /til list|publish|edit|search|delete|status|sync|tags|categories|batch to
+  manage entries -- all without leaving the CLI.
 homepage: https://opentil.ai
 license: MIT
 metadata:
   author: opentil
-  version: "1.1.1"
+  version: "1.2.0"
   primaryEnv: OPENTIL_TOKEN
 ---
 
@@ -39,10 +39,15 @@ The first word after `/til` determines the action. Reserved words route to manag
 | `/til edit <id> [instructions]` | AI-assisted edit |
 | `/til search <keyword>` | Search entries by title |
 | `/til delete <id>` | Delete entry (with confirmation) |
-| `/til <anything else>` | Capture content as a new TIL (existing behavior) |
-| `/til` | Extract best insight from conversation (existing behavior) |
+| `/til status` | Show site status and connection info |
+| `/til sync` | Sync local drafts to OpenTIL |
+| `/til tags` | List site tags with usage counts |
+| `/til categories` | List site categories |
+| `/til batch <topics>` | Batch-capture multiple TIL entries |
+| `/til <anything else>` | Capture content as a new TIL |
+| `/til` | Extract insights from conversation (multi-candidate) |
 
-Reserved words: `list`, `publish`, `unpublish`, `edit`, `search`, `delete`.
+Reserved words: `list`, `publish`, `unpublish`, `edit`, `search`, `delete`, `status`, `sync`, `tags`, `categories`, `batch`.
 
 ## API Quick Reference
 
@@ -85,6 +90,9 @@ curl -X POST "https://opentil.ai/api/v1/entries" \
 | `/entries/:id` | DELETE | Permanently delete entry |
 | `/entries/:id/publish` | POST | Publish a draft |
 | `/entries/:id/unpublish` | POST | Revert to draft |
+| `/site` | GET | Site info (username, entry counts, etc.) |
+| `/tags?sort=popular` | GET | List tags with usage counts |
+| `/categories` | GET | List categories with entry counts |
 
 > Full parameter list, response format, and error handling: see [references/api.md](references/api.md)
 
@@ -125,10 +133,35 @@ When `/til` is used without arguments, analyze the current conversation for lear
 **Steps:**
 
 1. Scan the conversation for knowledge worth preserving -- surprising facts, useful techniques, debugging breakthroughs, "aha" moments
-2. Pick the single most valuable insight
-3. Synthesize a standalone TIL entry (see Content Guidelines below)
-4. **Show the generated entry to the user and ask for confirmation before proceeding** -- the user must approve what gets captured, since the AI chose the topic
-5. On confirmation -> follow Execution Flow above (check token -> POST or save locally)
+2. Identify **all** TIL-worthy insights (not just one), up to 5
+3. Branch based on count:
+
+**0 insights:**
+```
+No clear TIL insights found in this conversation.
+```
+
+**1 insight:** Generate the full draft (title, body, tags), show it, ask for confirmation. On confirmation -> follow Execution Flow.
+
+**2+ insights:** Show a numbered list (max 5), let the user choose:
+```
+Found 3 TIL-worthy insights:
+
+  1. Go interfaces are satisfied implicitly
+  2. PostgreSQL JSONB arrays don't support GIN @>
+  3. CSS :has() enables parent selection
+
+Which to capture? (1/2/3/all/none)
+```
+
+- Single number -> generate draft for that insight, show confirmation, proceed
+- Comma-separated list (e.g. `1,3`) -> generate drafts for selected, show all for confirmation, POST sequentially
+- `all` -> generate drafts for each, show all for confirmation, POST sequentially
+- `none` -> cancel
+
+4. For each selected insight, generate a standalone TIL entry following Content Guidelines
+5. **Show the generated entry to the user and ask for confirmation before proceeding**
+6. On confirmation -> follow Execution Flow above (check token -> POST or save locally)
 
 ## Auto-Detection
 
@@ -158,18 +191,24 @@ When working alongside a user, proactively detect moments worth capturing as TIL
 
 ### Suggestion Format
 
-When a TIL-worthy moment is detected, use this format:
+Append the suggestion at the end of your normal response. Do not interrupt the workflow.
 
 ```
-I noticed something TIL-worthy: [one sentence summarizing the insight].
-Want me to capture it? (You can also just say /til anytime.)
+💡 [one sentence insight] -- worth a TIL? Just say /til to capture.
+```
+
+Example (at the end of a debugging response):
+```
+...so the fix is to close the channel before the goroutine exits.
+
+💡 Unclosed Go channels in goroutines cause silent memory leaks -- worth a TIL? Just say /til to capture.
 ```
 
 ### Double Confirmation
 
 Auto-detected TILs require two confirmations:
 
-1. **First confirmation** -- User agrees the insight is worth capturing
+1. **First confirmation** -- User replies `/til` (which triggers the extract flow and generates the draft)
 2. **Second confirmation** -- Show the full generated draft (title, body, tags); user approves before API call
 
 > Detailed trigger examples, state machine, and anti-patterns: see [references/auto-detection.md](references/auto-detection.md)
@@ -225,6 +264,42 @@ Permanently delete an entry.
 - Fetch the entry, show title and status
 - Double-confirm: "This cannot be undone. Type 'delete' to confirm."
 - On confirmation, `DELETE /entries/:id`
+
+### `/til status`
+
+Show site status and connection info. **Works without a token** (degraded display).
+
+- With token: `GET /site` -> show username, entry breakdown (total/published/drafts), token status, local draft count, dashboard link
+- Without token: show "not connected", local draft count, setup link
+
+### `/til sync`
+
+Explicitly sync local drafts from `~/.til/drafts/` to OpenTIL. Requires token.
+
+- List pending drafts, POST each one, delete local file on success
+- Show summary with success/failure per draft
+
+### `/til tags`
+
+List site tags sorted by usage count (top 20). Requires token.
+
+- API: `GET /tags?sort=popular&per_page=20&with_entries=true`
+- Show as compact table with tag name and entry count
+
+### `/til categories`
+
+List site categories. Requires token.
+
+- API: `GET /categories`
+- Show as compact table with name, entry count, and description
+
+### `/til batch <topics>`
+
+Batch-capture multiple TIL entries in one invocation. Requires explicit topic list.
+
+- User lists topics separated by newlines, semicolons, or markdown list items (`-` / `1.`)
+- Generate a draft for each -> show all drafts for confirmation -> POST sequentially
+- On partial failure, show per-entry success/failure (same format as `/til sync`)
 
 ### ID Resolution
 
@@ -292,6 +367,9 @@ Do NOT append any footer or attribution text to the content body.
 Every TIL entry must follow these rules:
 
 - **Self-contained**: The reader must understand the entry without any conversation context. Never write "as we discussed", "the above error", "this project's config", etc.
+- **Desensitized**: Remove project names, company details, colleague names, internal URLs, and proprietary business logic. Generalize specifics: "our User model" -> "a model", "the production server" -> "a production environment", "the Acme payment service" -> "a payment gateway".
+- **Universally valuable**: Write to StackOverflow-answer standards. A stranger searching for this topic should find the entry immediately useful. Content only useful to the author belongs in private notes, not TIL.
+- **Factual tone**: State facts, show examples, explain why. Avoid first-person narrative ("I was debugging...", "I discovered..."). Exception: brief situational context is fine ("When upgrading Rails from 7.2 to 8.0...").
 - **One insight per entry**: Each TIL teaches exactly ONE thing. If there are multiple insights, create separate entries.
 - **Concrete examples**: Include code snippets, commands, or specific data whenever relevant. Avoid vague descriptions.
 - **Title**: 5-15 words. Descriptive, same language as content. No "TIL:" prefix.
@@ -421,6 +499,7 @@ In Go, a type implements an interface...
 - The API auto-generates a URL slug from the title
 - Tags are created automatically if they don't exist on the site
 - Content is rendered to HTML server-side (Markdown with syntax highlighting)
-- Management subcommands (`list`, `publish`, `edit`, `search`, `delete`) require a token -- no local fallback
-- The `/til publish last` flow enables zero-friction capture-then-publish: `/til <content>` → `/til publish last`
-- Scope errors map to specific scopes: `list`/`search` need `read:entries`, `publish`/`unpublish`/`edit` need `write:entries`, `delete` needs `delete:entries`
+- Management subcommands (`list`, `publish`, `edit`, `search`, `delete`, `tags`, `categories`, `sync`, `batch`) require a token -- no local fallback. Exception: `status` works without a token (degraded display).
+- The `/til publish last` flow enables zero-friction capture-then-publish: `/til <content>` -> `/til publish last`
+- After publishing, include a share link: `https://x.com/intent/tweet?text=TIL%3A+<url-encoded-title>&url=<entry-url>`
+- Scope errors map to specific scopes: `list`/`search`/`tags`/`categories` need `read:entries`, `publish`/`unpublish`/`edit`/`sync`/`batch` need `write:entries`, `delete` needs `delete:entries`. `status` uses `read:entries` when available but works without a token.

@@ -98,35 +98,46 @@ Do not suggest TIL capture for:
 
 Once in DONE_FOR_SESSION, the agent never suggests again until a new session starts.
 
-## Suggestion Message Templates
+## Suggestion Format
 
-**Class A:**
-```
-I noticed something TIL-worthy: [root cause / surprising behavior in one sentence].
-Want me to capture it? (You can also just say /til anytime.)
-```
+All classes use the same format. The classification only affects the trigger threshold -- the user does not need to know the class.
 
-**Class B:**
+Append the suggestion at the end of your normal response. Never interrupt the workflow with a standalone suggestion message.
+
+**Template:**
 ```
-I noticed something TIL-worthy: [pattern / optimization / flag in one sentence].
-Want me to capture it? (You can also just say /til anytime.)
+💡 [one sentence insight] -- worth a TIL? Just say /til to capture.
 ```
 
-**Class C:**
+**Class A example** (debugging root cause):
 ```
-I noticed something TIL-worthy: [interaction / breaking change in one sentence].
-Want me to capture it? (You can also just say /til anytime.)
+...so the memory leak was caused by the goroutine holding a reference to the entire request body.
+
+💡 Goroutine closures can silently retain large objects, causing memory leaks -- worth a TIL? Just say /til to capture.
 ```
 
-The format is intentionally identical across classes -- the classification only affects the threshold for triggering. The user does not need to know the class.
+**Class B example** (performance optimization):
+```
+...the compound index on (user_id, created_at) reduced the query from 2.3s to 12ms.
+
+💡 Compound indexes with the right column order can yield 100x+ query speedups -- worth a TIL? Just say /til to capture.
+```
+
+**Class C example** (migration breaking change):
+```
+...Ruby 3.2 changed Struct keyword arguments to be required by default.
+
+💡 Ruby 3.2 makes Struct keyword args required by default, silently breaking existing code -- worth a TIL? Just say /til to capture.
+```
 
 ## Double Confirmation Flow
 
 ```
-Agent: I noticed something TIL-worthy: [summary].
-       Want me to capture it?
+Agent: [normal response content]
 
-User:  Yes / Sure / Go ahead
+       💡 [insight] -- worth a TIL? Just say /til to capture.
+
+User:  /til
 
 Agent: [Shows full draft: title, body, tags]
        Send this to OpenTIL as a draft?
@@ -137,4 +148,6 @@ Agent: [POST to API or save locally]
        [Show result message]
 ```
 
-If the user says no at either step, acknowledge and move on. Do not ask why or try to persuade.
+The first confirmation is the user typing `/til` -- this triggers the standard extract flow, which auto-selects the suggested insight as the primary candidate.
+
+If the user ignores the suggestion or says "no", move on. Do not ask why or try to persuade.

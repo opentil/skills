@@ -4,9 +4,9 @@ Detailed reference for TIL entry management via `/til` subcommands.
 
 ## Prerequisites
 
-- **Token required**: All management subcommands require `$OPENTIL_TOKEN`. There is no local fallback — management operations are API-only.
+- **Token required**: All management subcommands require `$OPENTIL_TOKEN`, except `/til status` which works without a token (degraded display). There is no local fallback — management operations are API-only.
 - **No local fallback**: Unlike `/til <content>` which can save locally, management commands need live API access.
-- **Missing token**: Show a clear error with the setup link:
+- **Missing token**: Show a clear error with the setup link (except for `status`):
 
 ```
 Token required for /til <subcommand>.
@@ -26,6 +26,11 @@ Set up: https://opentil.ai/dashboard/settings/tokens
 | `unpublish` | `write:entries` | `POST /entries/:id/unpublish` |
 | `edit` | `read:entries` + `write:entries` | `GET /entries/:id` + `PATCH /entries/:id` |
 | `delete` | `delete:entries` | `DELETE /entries/:id` |
+| `status` | `read:entries` (optional) | `GET /site` |
+| `sync` | `write:entries` | `POST /entries` (per draft) |
+| `tags` | `read:entries` | `GET /tags?sort=popular` |
+| `categories` | `read:entries` | `GET /categories` |
+| `batch` | `write:entries` | `POST /entries` (per topic) |
 
 When a 403 `insufficient_scope` error is returned, map the subcommand to the needed scope:
 
@@ -127,14 +132,18 @@ Confirm? (y/n)
 ```
 
 3. On confirmation → `POST /entries/:id/publish`
-4. Show result:
+4. Show result with share link:
 
 ```
 Published
 
   Title: Go interfaces are satisfied implicitly
   URL:   https://opentil.ai/@username/go-interfaces-are-satisfied-implicitly
+
+  Share: https://x.com/intent/tweet?text=TIL%3A+Go+interfaces+are+satisfied+implicitly&url=https%3A%2F%2Fopentil.ai%2F%40username%2Fgo-interfaces-are-satisfied-implicitly
 ```
+
+The share link is a Twitter/X intent URL with URL-encoded title (prefixed with `TIL: `) and entry URL.
 
 **Already published**: Informational, not an error.
 
@@ -251,6 +260,197 @@ Deleted.
 
   Title: Go interfaces are satisfied implicitly
 ```
+
+### `/til status`
+
+Show site status and connection info. **Special: works without a token** (degraded display).
+
+**With token** -- `GET /site`:
+
+```
+OpenTIL Status
+
+  Site:     @hong (opentil.ai/@hong)
+  Entries:  28 total (15 published, 13 drafts)
+  Token:    til_...a3f2 ✓
+  Local:    1 draft pending sync
+
+  Manage: https://opentil.ai/dashboard
+```
+
+- `Site` line: `@username` + public URL
+- `Entries` line: `entries_count` (total), `published_entries_count` (published), difference = drafts
+- `Token` line: last 4 chars of `$OPENTIL_TOKEN` + `✓`
+- `Local` line: count of `*.md` files in `~/.til/drafts/`
+- `Manage` link: dashboard URL
+
+**Without token:**
+
+```
+OpenTIL Status
+
+  Site:     (not connected)
+  Token:    not configured
+  Local:    3 drafts pending sync
+
+  Set up: https://opentil.ai/dashboard/settings/tokens
+```
+
+**Token set but API error** (401, network failure):
+
+```
+OpenTIL Status
+
+  Site:     (unable to connect)
+  Token:    til_...a3f2 ✗
+  Local:    0 drafts
+
+  Check token: https://opentil.ai/dashboard/settings/tokens
+```
+
+### `/til sync`
+
+Explicitly sync local drafts from `~/.til/drafts/` to OpenTIL. Requires token.
+
+**Flow:**
+
+1. List `*.md` files in `~/.til/drafts/`
+2. If no files: `No local drafts to sync.`
+3. Show what will be synced and ask for confirmation:
+
+```
+Found 2 local drafts:
+
+  1. go-interfaces.md
+  2. rails-solid-queue.md
+
+Sync to OpenTIL? (y/n)
+```
+
+4. On confirmation, for each file: parse frontmatter, POST to API (with correct attribution headers), delete local file on success
+5. Show results:
+
+**All synced:**
+
+```
+Synced 2 local drafts
+  ✓ go-interfaces.md
+  ✓ rails-solid-queue.md
+```
+
+**Partial failure:**
+```
+Synced 1 of 2 local drafts
+  ✓ go-interfaces.md
+  ✗ rails-solid-queue.md (validation error)
+    Kept at: ~/.til/drafts/20260210-150415-rails-solid-queue.md
+```
+
+### `/til tags`
+
+List site tags sorted by usage count. Requires token.
+
+**API call:** `GET /tags?sort=popular&per_page=20&with_entries=true`
+
+**Display format:**
+
+```
+Your tags (12):
+
+  Tag               Entries
+  go                      8
+  postgresql              5
+  rails                   4
+  css                     3
+  linux                   2
+  ...
+
+  Showing top 20 · 12 total tags
+```
+
+**Empty state:**
+```
+No tags yet. Tags are created automatically when you publish entries.
+```
+
+### `/til categories`
+
+List site categories. Requires token.
+
+**API call:** `GET /categories`
+
+**Display format:**
+
+```
+Your categories (3):
+
+  Name             Entries  Description
+  Backend              12   Server-side topics
+  Frontend              8   Client-side development
+  DevOps                5   Infrastructure and deployment
+
+  3 categories
+```
+
+**Empty state:**
+```
+No categories yet. Create them at: https://opentil.ai/dashboard/topics
+```
+
+### `/til batch <topics>`
+
+Batch-capture multiple TIL entries in one invocation. Requires an explicit topic list (no implicit extraction — use `/til` without arguments for that).
+
+**Input formats** -- user provides topics separated by newlines, semicolons, markdown list items (`-`), or numbered list (`1.`):
+
+```
+/til batch
+- Go channels block when buffer is full
+- CSS grid fr unit distributes remaining space
+- PostgreSQL EXPLAIN ANALYZE shows actual vs estimated rows
+```
+
+**Flow:**
+
+1. Parse the input into separate topics
+2. For each topic, generate a complete TIL entry (title, body, tags, lang)
+3. Show all drafts as a numbered list for review:
+
+```
+Generated 3 drafts:
+
+  1. Go channels block when buffer is full
+     Tags: go, concurrency
+  2. CSS grid fr unit distributes remaining space
+     Tags: css, grid
+  3. PostgreSQL EXPLAIN ANALYZE shows actual vs estimated rows
+     Tags: postgresql, performance
+
+Which to send? (1/2/3/all/none)
+```
+
+4. On confirmation, POST each selected entry sequentially
+5. Show summary:
+
+```
+Captured 3 TILs
+
+  ✓ Go channels block when buffer is full
+  ✓ CSS grid fr unit distributes remaining space
+  ✓ PostgreSQL EXPLAIN ANALYZE shows actual vs estimated rows
+```
+
+**Partial failure:**
+
+```
+Captured 2 of 3 TILs
+
+  ✓ Go channels block when buffer is full
+  ✗ CSS grid fr unit distributes remaining space (validation error)
+  ✓ PostgreSQL EXPLAIN ANALYZE shows actual vs estimated rows
+```
+
+Failed entries are saved locally to `~/.til/drafts/` (same as normal capture fallback).
 
 ## Error Handling
 
