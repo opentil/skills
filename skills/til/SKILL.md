@@ -1,30 +1,48 @@
 ---
 name: til
 description: >
-  Capture TIL (Today I Learned) entries and publish as drafts to OpenTIL.
-  Use /til <content> to capture explicitly, /til to extract the best insight
-  from conversation, or detect TIL-worthy moments proactively during work.
+  Capture and manage TIL (Today I Learned) entries on OpenTIL.
+  Use /til <content> to capture, /til to extract insights from conversation,
+  or /til list|publish|edit|search|delete to manage entries -- all without
+  leaving the CLI.
 homepage: https://opentil.ai
 license: MIT
 metadata:
   author: opentil
-  version: "1.0.0"
+  version: "1.1.0"
   primaryEnv: OPENTIL_TOKEN
 ---
 
 # til
 
-Capture "Today I Learned" entries from conversations and save them as drafts to OpenTIL.
+Capture and manage "Today I Learned" entries on OpenTIL -- from drafting to publishing, all within the CLI.
 
 ## Setup
 
-1. Go to https://opentil.ai/dashboard/settings/tokens and create a Personal Access Token with `write:entries` scope
+1. Go to https://opentil.ai/dashboard/settings/tokens and create a Personal Access Token with `read:entries`, `write:entries`, and `delete:entries` scopes
 2. Copy the token (starts with `til_`)
 3. Set the environment variable:
 
 ```bash
 export OPENTIL_TOKEN="til_xxx"
 ```
+
+## Subcommand Routing
+
+The first word after `/til` determines the action. Reserved words route to management subcommands; anything else is treated as content to capture.
+
+| Invocation | Action |
+|------------|--------|
+| `/til list [drafts\|published\|all]` | List entries (default: drafts) |
+| `/til publish [<id> \| last]` | Publish an entry |
+| `/til unpublish <id>` | Unpublish (revert to draft) |
+| `/til edit <id> [instructions]` | AI-assisted edit |
+| `/til search <keyword>` | Search entries by title |
+| `/til delete <id>` | Delete entry (with confirmation) |
+| `/til <anything else>` | Capture content as a new TIL (existing behavior) |
+| `/til` | Extract best insight from conversation (existing behavior) |
+
+Reserved words: `list`, `publish`, `unpublish`, `edit`, `search`, `delete`.
 
 ## API Quick Reference
 
@@ -45,7 +63,7 @@ curl -X POST "https://opentil.ai/api/v1/entries" \
   }'
 ```
 
-**Key parameters:**
+**Key create parameters:**
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -56,6 +74,17 @@ curl -X POST "https://opentil.ai/api/v1/entries" \
 | `lang` | string | no | Language code: `en`, `zh-CN`, `zh-TW`, `ja`, `ko`, etc. |
 | `slug` | string | no | Custom URL slug. Auto-generated from title if omitted. |
 | `visibility` | string | no | `public` (default), `unlisted`, or `private` |
+
+**Management endpoints:**
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/entries?status=draft&q=keyword` | GET | List/search entries |
+| `/entries/:id` | GET | Get a single entry |
+| `/entries/:id` | PATCH | Update entry fields |
+| `/entries/:id` | DELETE | Permanently delete entry |
+| `/entries/:id/publish` | POST | Publish a draft |
+| `/entries/:id/unpublish` | POST | Revert to draft |
 
 > Full parameter list, response format, and error handling: see [references/api.md](references/api.md)
 
@@ -144,6 +173,71 @@ Auto-detected TILs require two confirmations:
 2. **Second confirmation** -- Show the full generated draft (title, body, tags); user approves before API call
 
 > Detailed trigger examples, state machine, and anti-patterns: see [references/auto-detection.md](references/auto-detection.md)
+
+## Management Subcommands
+
+Management subcommands require `$OPENTIL_TOKEN`. There is no local fallback -- management operations need the API.
+
+### `/til list [drafts|published|all]`
+
+List entries. Default filter: `drafts`.
+
+- API: `GET /entries?status=<filter>&per_page=10`
+- Display as a compact table with short IDs (last 8 chars, prefixed with `...`)
+- Show pagination info at the bottom
+
+### `/til publish [<id> | last]`
+
+Publish a draft entry.
+
+- `last` resolves to the most recently created entry in this session (tracked via `last_created_entry_id` set on every successful POST)
+- Fetch the entry first, show title/tags, ask for confirmation
+- On success, display the published URL
+- If already published, show informational message (not an error)
+
+### `/til unpublish <id>`
+
+Revert a published entry to draft.
+
+- Fetch the entry first, confirm before unpublishing
+- If already a draft, show informational message
+
+### `/til edit <id> [instructions]`
+
+AI-assisted editing of an existing entry.
+
+- Fetch the full entry via `GET /entries/:id`
+- Apply changes based on instructions (or ask what to change if none given)
+- Show a diff preview of proposed changes
+- On confirmation, `PATCH /entries/:id` with only the changed fields
+
+### `/til search <keyword>`
+
+Search entries by title.
+
+- API: `GET /entries?q=<keyword>&per_page=10`
+- Same compact table format as `list`
+
+### `/til delete <id>`
+
+Permanently delete an entry.
+
+- Fetch the entry, show title and status
+- Double-confirm: "This cannot be undone. Type 'delete' to confirm."
+- On confirmation, `DELETE /entries/:id`
+
+### ID Resolution
+
+- In listings, show IDs in short form: `...` + last 8 characters
+- Accept both short and full IDs as input
+- Resolve short IDs by suffix match against the current listing
+- If ambiguous (multiple matches), ask for clarification
+
+### Session State
+
+Track `last_created_entry_id` -- set on every successful `POST /entries` (201). Used by `/til publish last`. Not persisted across sessions.
+
+> Detailed subcommand flows, display formats, and error handling: see [references/management.md](references/management.md)
 
 ## Agent Identity
 
@@ -323,7 +417,10 @@ In Go, a type implements an interface...
 
 ## Notes
 
-- All entries are created as drafts (`published: false`) -- review and publish on OpenTIL
+- All entries are created as drafts (`published: false`) -- publish via `/til publish` or on OpenTIL
 - The API auto-generates a URL slug from the title
 - Tags are created automatically if they don't exist on the site
 - Content is rendered to HTML server-side (Markdown with syntax highlighting)
+- Management subcommands (`list`, `publish`, `edit`, `search`, `delete`) require a token -- no local fallback
+- The `/til publish last` flow enables zero-friction capture-then-publish: `/til <content>` → `/til publish last`
+- Scope errors map to specific scopes: `list`/`search` need `read:entries`, `publish`/`unpublish`/`edit` need `write:entries`, `delete` needs `delete:entries`
