@@ -132,18 +132,14 @@ Confirm? (y/n)
 ```
 
 3. On confirmation → `POST /entries/:id/publish`
-4. Show result with share link:
+4. Show result:
 
 ```
 Published
 
   Title: Go interfaces are satisfied implicitly
   URL:   https://opentil.ai/@username/go-interfaces-are-satisfied-implicitly
-
-  Share: https://x.com/intent/tweet?text=TIL%3A+Go+interfaces+are+satisfied+implicitly&url=https%3A%2F%2Fopentil.ai%2F%40username%2Fgo-interfaces-are-satisfied-implicitly
 ```
-
-The share link is a Twitter/X intent URL with URL-encoded title (prefixed with `TIL: `) and entry URL.
 
 **Already published**: Informational, not an error.
 

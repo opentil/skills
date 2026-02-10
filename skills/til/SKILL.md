@@ -102,7 +102,7 @@ Every `/til` invocation follows this flow:
 
 1. **Generate** -- craft the TIL entry (title, body, tags, lang)
 2. **Check token** -- is `$OPENTIL_TOKEN` set?
-   - **Yes** -> POST to API with `published: true` -> show published URL + share link
+   - **Yes** -> POST to API with `published: true` -> show published URL
    - **No** -> save to `~/.til/drafts/` -> show first-run setup guide
 3. **Never lose content** -- the entry is always persisted somewhere
 4. **On API failure** -> save locally as draft (fallback unchanged)
@@ -372,7 +372,7 @@ Every TIL entry must follow these rules:
 - **One insight per entry**: Each TIL teaches exactly ONE thing. If there are multiple insights, create separate entries.
 - **Concrete examples**: Include code snippets, commands, or specific data whenever relevant. Avoid vague descriptions.
 - **Title**: 5-15 words. Descriptive, same language as content. No "TIL:" prefix.
-- **Content**: Concise Markdown, 1-5 paragraphs. Focus on the insight, not the process of learning it.
+- **Content**: Use the most efficient format for the knowledge — tables for comparisons (before/after, options, flags), code blocks for examples, lists for enumerations. Only use prose when explaining causation or context. Never pad content; if one sentence suffices, don't write a paragraph.
 - **Tags**: 1-3 lowercase tags from the technical domain (`go`, `rails`, `postgresql`, `css`, `linux`). No generic tags like `programming` or `til`.
 - **Lang**: Detect from content. Chinese -> `zh-CN`, Traditional Chinese -> `zh-TW`, English -> `en`, Japanese -> `ja`, Korean -> `ko`.
 - **Category**: Do not auto-infer `category_name` -- only include it if the user explicitly specifies a category/topic.
@@ -387,10 +387,9 @@ Published to OpenTIL
   Title:  Go interfaces are satisfied implicitly
   Tags:   go, interfaces
   URL:    https://opentil.ai/@username/go-interfaces-are-satisfied-implicitly
-  Share:  https://x.com/intent/tweet?text=TIL%3A+Go+interfaces+are+satisfied+implicitly&url=https%3A%2F%2Fopentil.ai%2F%40username%2Fgo-interfaces-are-satisfied-implicitly
 ```
 
-Extract the `url` field from the API response for the URL and Share link.
+Extract the `url` field from the API response for the URL.
 
 ### Sync Local Drafts
 
@@ -500,5 +499,4 @@ In Go, a type implements an interface...
 - Tags are created automatically if they don't exist on the site
 - Content is rendered to HTML server-side (Markdown with syntax highlighting)
 - Management subcommands (`list`, `publish`, `edit`, `search`, `delete`, `tags`, `categories`, `sync`, `batch`) require a token -- no local fallback. Exception: `status` works without a token (degraded display).
-- After publishing, include a share link: `https://x.com/intent/tweet?text=TIL%3A+<url-encoded-title>&url=<entry-url>`
 - Scope errors map to specific scopes: `list`/`search`/`tags`/`categories` need `read:entries`, `publish`/`unpublish`/`edit`/`sync`/`batch` need `write:entries`, `delete` needs `delete:entries`. `status` uses `read:entries` when available but works without a token.
