@@ -51,7 +51,7 @@ Reserved words: `list`, `publish`, `unpublish`, `edit`, `search`, `delete`, `sta
 
 ## API Quick Reference
 
-**Create a draft entry:**
+**Create and publish an entry:**
 
 ```bash
 curl -X POST "https://opentil.ai/api/v1/entries" \
@@ -62,7 +62,7 @@ curl -X POST "https://opentil.ai/api/v1/entries" \
       "title": "Go interfaces are satisfied implicitly",
       "content": "In Go, a type implements an interface...",
       "tag_names": ["go", "interfaces"],
-      "published": false,
+      "published": true,
       "lang": "en"
     }
   }'
@@ -102,11 +102,10 @@ Every `/til` invocation follows this flow:
 
 1. **Generate** -- craft the TIL entry (title, body, tags, lang)
 2. **Check token** -- is `$OPENTIL_TOKEN` set?
-   - **Yes** -> POST to API with `published: false` -> show confirmation with Review link
+   - **Yes** -> POST to API with `published: true` -> show published URL + share link
    - **No** -> save to `~/.til/drafts/` -> show first-run setup guide
 3. **Never lose content** -- the entry is always persisted somewhere
-
-All entries are always created as drafts (`published: false`). The user reviews and publishes on OpenTIL.
+4. **On API failure** -> save locally as draft (fallback unchanged)
 
 ## `/til <content>` -- Explicit Capture
 
@@ -355,7 +354,7 @@ Do NOT append any footer or attribution text to the content body.
 | Dimension | `/til <content>` | `/til` | Auto-detected |
 |-----------|-----------------|--------|---------------|
 | Trigger | User explicit | User command | Agent proactive |
-| Confirmations | 0 (direct) | 1 (draft) | 2 (suggest + draft) |
+| Confirmations | 0 (direct publish) | 1 (review before publish) | 2 (suggest + review) |
 | Source header | `human` | `human` | `agent` |
 | Agent header | Yes | Yes | Yes |
 | Model header | Yes | Yes | Yes |
@@ -383,14 +382,15 @@ Every TIL entry must follow these rules:
 ### API Success (token configured, 201)
 
 ```
-Draft saved to OpenTIL
+Published to OpenTIL
 
   Title:  Go interfaces are satisfied implicitly
   Tags:   go, interfaces
-  Review: https://opentil.ai/@username/go-interfaces-are-satisfied-implicitly
+  URL:    https://opentil.ai/@username/go-interfaces-are-satisfied-implicitly
+  Share:  https://x.com/intent/tweet?text=TIL%3A+Go+interfaces+are+satisfied+implicitly&url=https%3A%2F%2Fopentil.ai%2F%40username%2Fgo-interfaces-are-satisfied-implicitly
 ```
 
-Extract the `url` field from the API response for the Review link.
+Extract the `url` field from the API response for the URL and Share link.
 
 ### Sync Local Drafts
 
@@ -495,11 +495,10 @@ In Go, a type implements an interface...
 
 ## Notes
 
-- All entries are created as drafts (`published: false`) -- publish via `/til publish` or on OpenTIL
+- Entries are published immediately by default (`published: true`) -- use `/til unpublish <id>` to revert to draft
 - The API auto-generates a URL slug from the title
 - Tags are created automatically if they don't exist on the site
 - Content is rendered to HTML server-side (Markdown with syntax highlighting)
 - Management subcommands (`list`, `publish`, `edit`, `search`, `delete`, `tags`, `categories`, `sync`, `batch`) require a token -- no local fallback. Exception: `status` works without a token (degraded display).
-- The `/til publish last` flow enables zero-friction capture-then-publish: `/til <content>` -> `/til publish last`
 - After publishing, include a share link: `https://x.com/intent/tweet?text=TIL%3A+<url-encoded-title>&url=<entry-url>`
 - Scope errors map to specific scopes: `list`/`search`/`tags`/`categories` need `read:entries`, `publish`/`unpublish`/`edit`/`sync`/`batch` need `write:entries`, `delete` needs `delete:entries`. `status` uses `read:entries` when available but works without a token.

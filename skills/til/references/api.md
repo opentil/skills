@@ -22,7 +22,7 @@ All fields are nested under `entry`. Additionally, `tag_names` and `category_nam
 | `tag_names` | array | no | 1-3 lowercase tags, e.g. `["go", "concurrency"]` |
 | `category_name` | string | no | Category name. Only include if the user explicitly specifies one. |
 | `category_id` | integer | no | Category ID (alternative to `category_name`). |
-| `published` | boolean | no | `false` for draft (default), `true` to publish immediately. **Always use `false`.** |
+| `published` | boolean | no | `false` for draft (default), `true` to publish immediately. |
 | `published_at` | datetime | no | ISO 8601 timestamp. Only relevant when publishing. |
 | `visibility` | string | no | `public` (default), `unlisted`, or `private` |
 | `meta_description` | string | no | SEO meta description |
