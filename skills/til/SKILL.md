@@ -188,49 +188,51 @@ Which to capture? (1/2/3/all/none)
 
 When working alongside a user, proactively detect moments worth capturing as TIL entries.
 
-### Trigger Conditions
+### When to Suggest
 
-**Class A (High signal):**
+Suggest when the conversation produces a genuine "aha" moment — something surprising, non-obvious, or worth remembering. Examples:
+
 - Debugging uncovered a non-obvious root cause
-- Discovered a language/framework behavior that contradicts common assumptions
-
-**Class B (Medium signal):**
+- A language/framework behavior contradicted common assumptions
 - Refactoring revealed a clearly superior pattern
-- Performance optimization yielded a measurable improvement
-- Found an obscure but highly useful tool flag or API parameter
-
-**Class C (Low signal):**
+- Performance optimization yielded measurable improvement
+- An obscure but useful tool flag or API parameter was discovered
 - Two technologies interacting produced unexpected behavior
-- Upgrade/migration surfaced a breaking change worth documenting
 
-### Rate Limiting (Anti-Annoyance)
+Do NOT suggest for: standard tool usage, documented behavior, typo-caused bugs, or widely known best practices.
 
-1. **Maximum 1 suggestion per session** -- after suggesting once, do not suggest again regardless of outcome
-2. **Natural pauses only** -- never interrupt active problem-solving; suggest only at resolution points or between tasks
-3. **Minimum conversation depth** -- at least 10 turns of conversation before first suggestion (Class A may trigger after 5 turns)
-4. **Respect rejection** -- if the user declines, do not suggest again in this session
+### Rate Limiting
+
+1. **Once per session** — after suggesting once (accepted or declined), never suggest again
+2. **Natural pauses only** — suggest at resolution points or task boundaries, never mid-problem-solving
+3. **Respect rejection** — if declined, move on without persuasion
 
 ### Suggestion Format
 
-Append the suggestion at the end of your normal response. Do not interrupt the workflow.
+Append at the end of your normal response. Never interrupt workflow.
 
+**Template:**
 ```
-💡 [one sentence insight] -- worth a TIL? Just say /til to capture.
+💡 TIL: [concise title of the insight]
+   Tags: [tag1, tag2] · Capture? (yes/no)
 ```
 
-Example (at the end of a debugging response):
+**Example** (at the end of a debugging response):
 ```
 ...so the fix is to close the channel before the goroutine exits.
 
-💡 Unclosed Go channels in goroutines cause silent memory leaks -- worth a TIL? Just say /til to capture.
+💡 TIL: Unclosed Go channels in goroutines cause silent memory leaks
+   Tags: go, concurrency · Capture? (yes/no)
 ```
 
-### Double Confirmation
+### Capture Flow
 
-Auto-detected TILs require two confirmations:
+Auto-detected TILs bypass the extract flow. The suggestion itself is the candidate.
 
-1. **First confirmation** -- User replies `/til` (which triggers the extract flow and generates the draft)
-2. **Second confirmation** -- Show the full generated draft (title, body, tags); user approves before API call
+1. User replies `yes` / `y` / `ok` / `sure` → agent generates full entry (title, body, tags, lang) from the suggested insight → follows Execution Flow (POST or save locally)
+2. User replies `no` / ignores / continues other topic → move on, do not ask again
+
+Non-affirmative responses (continuing the conversation about something else) are treated as implicit decline.
 
 > Detailed trigger examples, state machine, and anti-patterns: see references/auto-detection.md
 
@@ -376,7 +378,7 @@ Do NOT append any footer or attribution text to the content body.
 | Dimension | `/til <content>` | `/til` | Auto-detected |
 |-----------|-----------------|--------|---------------|
 | Trigger | User explicit | User command | Agent proactive |
-| Confirmations | 0 (direct publish) | 1 (review before publish) | 2 (suggest + review) |
+| Confirmations | 0 (direct publish) | 1 (review before publish) | 1 (suggest → capture) |
 | Source header | `human` | `human` | `agent` |
 | Agent header | Yes | Yes | Yes |
 | Model header | Yes | Yes | Yes |
