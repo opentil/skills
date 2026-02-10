@@ -20,7 +20,7 @@ Capture TIL entries as drafts to OpenTIL.
 
 ### Setup
 
-1. Create a token at https://opentil.ai/dashboard/tokens (select `write:entries` scope)
+1. Create a token at https://opentil.ai/dashboard/settings/tokens (select `write:entries` scope)
 2. Set the environment variable: `export OPENTIL_TOKEN="til_xxx"`
 
 See [skills/til/SKILL.md](skills/til/SKILL.md) for full documentation.

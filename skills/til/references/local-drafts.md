@@ -116,7 +116,7 @@ TIL captured
 
 -- Connect to OpenTIL to sync your TILs --
 
-  1. Get a token: https://opentil.ai/dashboard/tokens
+  1. Get a token: https://opentil.ai/dashboard/settings/tokens
      (select write:entries scope)
   2. Set the environment variable:
      export OPENTIL_TOKEN="til_xxx"

@@ -18,7 +18,7 @@ Capture "Today I Learned" entries from conversations and save them as drafts to 
 
 ## Setup
 
-1. Go to https://opentil.ai/dashboard/tokens and create a Personal Access Token with `write:entries` scope
+1. Go to https://opentil.ai/dashboard/settings/tokens and create a Personal Access Token with `write:entries` scope
 2. Copy the token (starts with `til_`)
 3. Set the environment variable:
 
@@ -259,7 +259,7 @@ TIL captured
 
 -- Connect to OpenTIL to sync your TILs --
 
-  1. Get a token: https://opentil.ai/dashboard/tokens
+  1. Get a token: https://opentil.ai/dashboard/settings/tokens
      (select write:entries scope)
   2. Set the environment variable:
      export OPENTIL_TOKEN="til_xxx"
@@ -290,7 +290,7 @@ TIL captured (saved locally -- token expired)
 
   File: ~/.til/drafts/20260210-143022-go-interfaces.md
 
-Regenerate at: https://opentil.ai/dashboard/tokens
+Regenerate at: https://opentil.ai/dashboard/settings/tokens
 ```
 
 **Network failure or 5xx:**
