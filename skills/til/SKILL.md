@@ -49,6 +49,28 @@ The first word after `/til` determines the action. Reserved words route to manag
 
 Reserved words: `list`, `publish`, `unpublish`, `edit`, `search`, `delete`, `status`, `sync`, `tags`, `categories`, `batch`.
 
+## Reference Loading
+
+⚠️ DO NOT read reference files unless specified below. SKILL.md contains enough inline context for most operations.
+
+### On subcommand dispatch (load before execution):
+
+| Subcommand | References to load |
+|------------|--------------------|
+| `/til <content>` | none |
+| `/til` (extract from conversation) | none |
+| `/til list\|status\|tags\|categories` | [references/management.md](references/management.md) |
+| `/til publish\|unpublish\|edit\|search\|delete\|batch` | [references/management.md](references/management.md) |
+| `/til sync` | [references/management.md](references/management.md), [references/local-drafts.md](references/local-drafts.md) |
+
+### On-demand (load only when the situation arises):
+
+| Trigger | Reference to load |
+|---------|-------------------|
+| API returns non-2xx after inline error handling is insufficient | [references/api.md](references/api.md) |
+| Auto-detection context (proactive TIL suggestion) | [references/auto-detection.md](references/auto-detection.md) |
+| No `$OPENTIL_TOKEN` configured (first-run local fallback) | [references/local-drafts.md](references/local-drafts.md) |
+
 ## API Quick Reference
 
 **Create and publish an entry:**
@@ -94,7 +116,7 @@ curl -X POST "https://opentil.ai/api/v1/entries" \
 | `/tags?sort=popular` | GET | List tags with usage counts |
 | `/categories` | GET | List categories with entry counts |
 
-> Full parameter list, response format, and error handling: see [references/api.md](references/api.md)
+> Full parameter list, response format, and error handling: see references/api.md
 
 ## Execution Flow
 
@@ -210,7 +232,7 @@ Auto-detected TILs require two confirmations:
 1. **First confirmation** -- User replies `/til` (which triggers the extract flow and generates the draft)
 2. **Second confirmation** -- Show the full generated draft (title, body, tags); user approves before API call
 
-> Detailed trigger examples, state machine, and anti-patterns: see [references/auto-detection.md](references/auto-detection.md)
+> Detailed trigger examples, state machine, and anti-patterns: see references/auto-detection.md
 
 ## Management Subcommands
 
@@ -311,7 +333,7 @@ Batch-capture multiple TIL entries in one invocation. Requires explicit topic li
 
 Track `last_created_entry_id` -- set on every successful `POST /entries` (201). Used by `/til publish last`. Not persisted across sessions.
 
-> Detailed subcommand flows, display formats, and error handling: see [references/management.md](references/management.md)
+> Detailed subcommand flows, display formats, and error handling: see references/management.md
 
 ## Agent Identity
 
@@ -472,7 +494,7 @@ TIL captured (saved locally -- API unavailable)
   File: ~/.til/drafts/20260210-143022-go-interfaces.md
 ```
 
-> Full error codes, 422 auto-fix logic, and rate limit details: see [references/api.md](references/api.md)
+> Full error codes, 422 auto-fix logic, and rate limit details: see references/api.md
 
 ## Local Draft Fallback
 
@@ -490,7 +512,7 @@ lang: en
 In Go, a type implements an interface...
 ```
 
-> Full directory structure, metadata fields, and sync protocol: see [references/local-drafts.md](references/local-drafts.md)
+> Full directory structure, metadata fields, and sync protocol: see references/local-drafts.md
 
 ## Notes
 
