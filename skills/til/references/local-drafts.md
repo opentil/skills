@@ -105,7 +105,7 @@ Synced 2 of 3 local drafts
 
 ## First-Run Guide Template
 
-On the first local save in a session (when `$OPENTIL_TOKEN` is not set):
+On the first local save in a session (when no token is found):
 
 ```
 TIL captured
@@ -114,14 +114,7 @@ TIL captured
   Tags:   go, interfaces
   File:   ~/.til/drafts/20260210-143022-go-interfaces.md
 
--- Connect to OpenTIL to sync your TILs --
-
-  1. Get a token: https://opentil.ai/dashboard/settings/tokens
-     (select write:entries scope)
-  2. Set the environment variable:
-     export OPENTIL_TOKEN="til_xxx"
-
-Your TILs will sync as drafts automatically.
+Sync to OpenTIL? Run: /til auth
 ```
 
 On subsequent local saves in the same session, use the short form:

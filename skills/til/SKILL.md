@@ -27,6 +27,14 @@ Capture and manage "Today I Learned" entries on OpenTIL -- from drafting to publ
 export OPENTIL_TOKEN="til_xxx"
 ```
 
+### Token Resolution
+
+Token resolution order:
+1. `$OPENTIL_TOKEN` environment variable
+2. `~/.til/credentials` file (created by `/til auth`)
+
+If neither is set, entries are saved locally to `~/.til/drafts/`.
+
 ## Subcommand Routing
 
 The first word after `/til` determines the action. Reserved words route to management subcommands; anything else is treated as content to capture.
@@ -44,10 +52,11 @@ The first word after `/til` determines the action. Reserved words route to manag
 | `/til tags` | List site tags with usage counts |
 | `/til categories` | List site categories |
 | `/til batch <topics>` | Batch-capture multiple TIL entries |
+| `/til auth` | Connect OpenTIL account (browser auth) |
 | `/til <anything else>` | Capture content as a new TIL |
 | `/til` | Extract insights from conversation (multi-candidate) |
 
-Reserved words: `list`, `publish`, `unpublish`, `edit`, `search`, `delete`, `status`, `sync`, `tags`, `categories`, `batch`.
+Reserved words: `list`, `publish`, `unpublish`, `edit`, `search`, `delete`, `status`, `sync`, `tags`, `categories`, `batch`, `auth`.
 
 ## Reference Loading
 
@@ -62,6 +71,7 @@ Reserved words: `list`, `publish`, `unpublish`, `edit`, `search`, `delete`, `sta
 | `/til list\|status\|tags\|categories` | [references/management.md](references/management.md) |
 | `/til publish\|unpublish\|edit\|search\|delete\|batch` | [references/management.md](references/management.md) |
 | `/til sync` | [references/management.md](references/management.md), [references/local-drafts.md](references/local-drafts.md) |
+| `/til auth` | [references/management.md](references/management.md), [references/api.md](references/api.md) |
 
 ### On-demand (load only when the situation arises):
 
@@ -69,7 +79,7 @@ Reserved words: `list`, `publish`, `unpublish`, `edit`, `search`, `delete`, `sta
 |---------|-------------------|
 | API returns non-2xx after inline error handling is insufficient | [references/api.md](references/api.md) |
 | Auto-detection context (proactive TIL suggestion) | [references/auto-detection.md](references/auto-detection.md) |
-| No `$OPENTIL_TOKEN` configured (first-run local fallback) | [references/local-drafts.md](references/local-drafts.md) |
+| No token found (first-run local fallback) | [references/local-drafts.md](references/local-drafts.md) |
 
 ## API Quick Reference
 
@@ -123,9 +133,9 @@ curl -X POST "https://opentil.ai/api/v1/entries" \
 Every `/til` invocation follows this flow:
 
 1. **Generate** -- craft the TIL entry (title, body, tags, lang)
-2. **Check token** -- is `$OPENTIL_TOKEN` set?
-   - **Yes** -> POST to API with `published: true` -> show published URL
-   - **No** -> save to `~/.til/drafts/` -> show first-run setup guide
+2. **Check token** -- resolve token (env var → `~/.til/credentials`)
+   - **Found** -> POST to API with `published: true` -> show published URL
+   - **Not found** -> save to `~/.til/drafts/` -> show first-run setup guide
 3. **Never lose content** -- the entry is always persisted somewhere
 4. **On API failure** -> save locally as draft (fallback unchanged)
 
@@ -238,7 +248,7 @@ Non-affirmative responses (continuing the conversation about something else) are
 
 ## Management Subcommands
 
-Management subcommands require `$OPENTIL_TOKEN`. There is no local fallback -- management operations need the API.
+Management subcommands require a token. There is no local fallback -- management operations need the API.
 
 ### `/til list [drafts|published|all]`
 
@@ -443,7 +453,7 @@ If the user declines, keep the local files and do not ask again in this session.
 
 ### First Run (no token)
 
-Save the draft locally, then show a warm setup guide. This is NOT an error -- the user successfully captured a TIL.
+Save the draft locally, then show a concise setup hint. This is NOT an error -- the user successfully captured a TIL.
 
 ```
 TIL captured
@@ -452,17 +462,10 @@ TIL captured
   Tags:   go, interfaces
   File:   ~/.til/drafts/20260210-143022-go-interfaces.md
 
--- Connect to OpenTIL to sync your TILs --
-
-  1. Get a token: https://opentil.ai/dashboard/settings/tokens
-     (select write:entries scope)
-  2. Set the environment variable:
-     export OPENTIL_TOKEN="til_xxx"
-
-Your TILs will sync as drafts automatically.
+Sync to OpenTIL? Run: /til auth
 ```
 
-Only show the full setup guide on the **first** local save in this session. On subsequent saves, use the short form:
+Only show the setup hint on the **first** local save in this session. On subsequent saves, use the short form:
 
 ```
 TIL captured
@@ -485,7 +488,7 @@ TIL captured (saved locally -- token expired)
 
   File: ~/.til/drafts/20260210-143022-go-interfaces.md
 
-Regenerate at: https://opentil.ai/dashboard/settings/tokens
+Token expired. Run /til auth to reconnect.
 ```
 
 **Network failure or 5xx:**
@@ -522,5 +525,5 @@ In Go, a type implements an interface...
 - The API auto-generates a URL slug from the title
 - Tags are created automatically if they don't exist on the site
 - Content is rendered to HTML server-side (Markdown with syntax highlighting)
-- Management subcommands (`list`, `publish`, `edit`, `search`, `delete`, `tags`, `categories`, `sync`, `batch`) require a token -- no local fallback. Exception: `status` works without a token (degraded display).
+- Management subcommands (`list`, `publish`, `edit`, `search`, `delete`, `tags`, `categories`, `sync`, `batch`) require a token -- no local fallback. Exception: `status` and `auth` work without a token.
 - Scope errors map to specific scopes: `list`/`search`/`tags`/`categories` need `read:entries`, `publish`/`unpublish`/`edit`/`sync`/`batch` need `write:entries`, `delete` needs `delete:entries`. `status` uses `read:entries` when available but works without a token.

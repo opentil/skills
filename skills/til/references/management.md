@@ -4,16 +4,12 @@ Detailed reference for TIL entry management via `/til` subcommands.
 
 ## Prerequisites
 
-- **Token required**: All management subcommands require `$OPENTIL_TOKEN`, except `/til status` which works without a token (degraded display). There is no local fallback — management operations are API-only.
+- **Token required**: All management subcommands require a token (env var or `~/.til/credentials`), except `/til status` and `/til auth` which work without a token. There is no local fallback — management operations are API-only.
 - **No local fallback**: Unlike `/til <content>` which can save locally, management commands need live API access.
-- **Missing token**: Show a clear error with the setup link (except for `status`):
+- **Missing token**: Show a clear error (except for `status` and `auth`):
 
 ```
-Token required for /til <subcommand>.
-
-Set up: https://opentil.ai/dashboard/settings/tokens
-  → Create a token with read:entries, write:entries, delete:entries scopes
-  → export OPENTIL_TOKEN="til_xxx"
+Token required. Run /til auth to connect.
 ```
 
 ## Scope Requirements
@@ -276,7 +272,7 @@ OpenTIL Status
 
 - `Site` line: `@username` + public URL
 - `Entries` line: `entries_count` (total), `published_entries_count` (published), difference = drafts
-- `Token` line: last 4 chars of `$OPENTIL_TOKEN` + `✓`
+- `Token` line: last 4 chars of the resolved token + `✓`
 - `Local` line: count of `*.md` files in `~/.til/drafts/`
 - `Manage` link: dashboard URL
 
@@ -289,7 +285,7 @@ OpenTIL Status
   Token:    not configured
   Local:    3 drafts pending sync
 
-  Set up: https://opentil.ai/dashboard/settings/tokens
+  Run /til auth to connect
 ```
 
 **Token set but API error** (401, network failure):
@@ -303,6 +299,84 @@ OpenTIL Status
 
   Check token: https://opentil.ai/dashboard/settings/tokens
 ```
+
+### `/til auth`
+
+Connect an OpenTIL account via Device Flow (browser-based authorization). **Works without a token.**
+
+**Flow:**
+
+1. **Check existing connection**
+   - Resolve token (env var → `~/.til/credentials`)
+   - If token found, `GET /site` to verify:
+     - Valid: `"Already connected as @{username}. Re-authorize? (y/n)"`
+       - `y` → continue to new authorization
+       - `n` → end
+     - Invalid (401) → continue to new authorization
+   - If no token → continue to new authorization
+
+2. **Create device code**
+   - `POST /api/v1/oauth/device/code` with `{ "scopes": ["read", "write"] }`
+   - Response: `{ device_code, user_code, verification_uri, expires_in, interval }`
+
+3. **Open browser + display**
+   - Open `{verification_uri}?user_code={user_code}` via `open` (macOS) or `xdg-open` (Linux)
+   - Display:
+
+```
+Opening browser to connect...
+
+If browser didn't open, visit:
+  https://opentil.ai/device
+Enter code: XXXX-YYYY
+
+Waiting for authorization...
+```
+
+4. **Poll for token**
+   - Use a bash script to poll in a single command (not multiple turns):
+     - Every `{interval}` seconds, `POST /api/v1/oauth/device/token`
+     - `authorization_pending` → continue polling
+     - `slow_down` → increase interval by 5 seconds
+     - `expired_token` → timeout
+     - 200 → extract `access_token`
+   - Hard timeout: 300 seconds (5 minutes)
+
+5. **On success**
+   - Create `~/.til/` directory if it doesn't exist
+   - Write token to `~/.til/credentials` (plain text, `chmod 600`)
+   - Display:
+
+```
+✓ Connected to OpenTIL
+  Token saved to ~/.til/credentials
+```
+
+   - Check `~/.til/drafts/` for local drafts
+   - If drafts exist: `"Found N local drafts. Sync now? (y/n)"`
+
+6. **On timeout**
+
+```
+Authorization timed out. Run /til auth to try again.
+```
+
+7. **On network error**
+
+```
+Unable to reach OpenTIL. Check your connection and try again.
+```
+
+**Edge cases:**
+
+| Scenario | Handling |
+|----------|----------|
+| Already has valid token | Confirm before re-authorizing |
+| Token expired/invalid | Proceed directly to new authorization, no confirmation |
+| `~/.til/` directory doesn't exist | Create automatically |
+| Browser didn't open | Display fallback URL + manual code entry |
+| User cancels in browser | Polling times out, show timeout message |
+| Token obtained + local drafts exist | Offer to sync |
 
 ### `/til sync`
 
@@ -453,11 +527,7 @@ Failed entries are saved locally to `~/.til/drafts/` (same as normal capture fal
 ### Missing Token
 
 ```
-Token required for /til <subcommand>.
-
-Set up: https://opentil.ai/dashboard/settings/tokens
-  → Create a token with read:entries, write:entries, delete:entries scopes
-  → export OPENTIL_TOKEN="til_xxx"
+Token required. Run /til auth to connect.
 ```
 
 ### Insufficient Scope (403)

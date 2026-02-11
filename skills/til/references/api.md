@@ -196,7 +196,7 @@ Returns the full EntrySerializer response with `published: false`.
 
 | Status | Code | Action |
 |--------|------|--------|
-| 401 | `unauthorized` | Token invalid or expired. Save locally. Show regenerate link. |
+| 401 | `unauthorized` | Token invalid or expired. Save locally. Show: `Token expired. Run /til auth to reconnect.` |
 | 403 | `insufficient_scope` | Token lacks required scope. Show which scope is needed. |
 | 404 | `not_found` | Entry does not exist or belongs to another user. |
 | 422 | `validation_failed` | Parse `details` array, auto-fix, and retry once. Save locally if retry fails. |
@@ -332,3 +332,79 @@ Rate limit info is returned in response headers:
 | `X-RateLimit-Reset` | Unix timestamp when the window resets |
 
 When `429` is received, save the draft locally and inform the user. Do not retry automatically -- the user's workflow should not be blocked by rate limits.
+
+## Device Flow (OAuth)
+
+These endpoints do not require a Bearer token. Used by `/til auth` to obtain a token via browser authorization.
+
+### POST /oauth/device/code
+
+Create a device authorization code.
+
+```
+POST /api/v1/oauth/device/code
+Content-Type: application/json
+
+{ "scopes": ["read", "write"] }
+```
+
+**200 Response:**
+
+```json
+{
+  "device_code": "uuid-string",
+  "user_code": "XXXX-YYYY",
+  "verification_uri": "https://opentil.ai/device",
+  "expires_in": 900,
+  "interval": 5
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `device_code` | Opaque code used to poll for the token |
+| `user_code` | Human-readable code displayed to the user |
+| `verification_uri` | URL where the user authorizes the device |
+| `expires_in` | Seconds until the device code expires |
+| `interval` | Minimum polling interval in seconds |
+
+### POST /oauth/device/token
+
+Poll for an access token after the user authorizes.
+
+```
+POST /api/v1/oauth/device/token
+Content-Type: application/json
+
+{ "device_code": "uuid-string", "grant_type": "urn:ietf:params:oauth:grant-type:device_code" }
+```
+
+**200 Response (authorized):**
+
+```json
+{
+  "access_token": "til_xxx...",
+  "token_type": "bearer",
+  "scope": "read write"
+}
+```
+
+**400 Response (pending):**
+
+```json
+{
+  "error": {
+    "code": "authorization_pending",
+    "message": "The user has not yet authorized this device"
+  }
+}
+```
+
+**Error codes:**
+
+| Code | Meaning | Action |
+|------|---------|--------|
+| `authorization_pending` | User hasn't authorized yet | Continue polling |
+| `slow_down` | Polling too fast | Increase interval by 5 seconds |
+| `expired_token` | Device code expired | Stop polling, show timeout message |
+| `invalid_grant` | Invalid device code | Stop polling, show error |
