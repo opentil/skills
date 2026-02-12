@@ -93,6 +93,7 @@ curl -X POST "https://opentil.ai/api/v1/entries" \
     "entry": {
       "title": "Go interfaces are satisfied implicitly",
       "content": "In Go, a type implements an interface...",
+      "summary": "Go types implement interfaces implicitly by implementing their methods, with no explicit declaration needed.",
       "tag_names": ["go", "interfaces"],
       "published": true,
       "lang": "en"
@@ -111,6 +112,7 @@ curl -X POST "https://opentil.ai/api/v1/entries" \
 | `lang` | string | no | Language code: `en`, `zh-CN`, `zh-TW`, `ja`, `ko`, etc. |
 | `slug` | string | no | Custom URL slug. Auto-generated from title if omitted. |
 | `visibility` | string | no | `public` (default), `unlisted`, or `private` |
+| `summary` | string | no | AI-generated summary for listing pages (max 500 chars) |
 
 **Management endpoints:**
 
@@ -132,7 +134,7 @@ curl -X POST "https://opentil.ai/api/v1/entries" \
 
 Every `/til` invocation follows this flow:
 
-1. **Generate** -- craft the TIL entry (title, body, tags, lang)
+1. **Generate** -- craft the TIL entry (title, body, summary, tags, lang)
 2. **Check token** -- resolve token (env var → `~/.til/credentials`)
    - **Found** -> POST to API with `published: true` -> show published URL
    - **Not found** -> save to `~/.til/drafts/` -> show first-run setup guide
@@ -151,9 +153,10 @@ The user's input is **raw material** -- a seed, not the final entry. Generate a 
 1. Treat the user's input as a seed -- craft a complete title + body from it
 2. Generate a concise title (5-15 words) in the same language as the content
 3. Write a self-contained Markdown body (see Content Guidelines below)
-4. Infer 1-3 lowercase tags from technical domain (e.g. `rails`, `postgresql`, `go`)
-5. Detect language -> set `lang` (`en`, `zh-CN`, `zh-TW`, `ja`, `ko`, `es`, `fr`, `de`, `pt-BR`, `pt`, `ru`, `ar`, `bs`, `da`, `nb`, `pl`, `th`, `tr`, `it`)
-6. Follow Execution Flow above (check token -> POST or save locally)
+4. Generate a summary (see Summary Guidelines below)
+5. Infer 1-3 lowercase tags from technical domain (e.g. `rails`, `postgresql`, `go`)
+6. Detect language -> set `lang` (`en`, `zh-CN`, `zh-TW`, `ja`, `ko`, `es`, `fr`, `de`, `pt-BR`, `pt`, `ru`, `ar`, `bs`, `da`, `nb`, `pl`, `th`, `tr`, `it`)
+7. Follow Execution Flow above (check token -> POST or save locally)
 
 No confirmation needed -- the user explicitly asked to capture. Execute directly.
 
@@ -410,6 +413,7 @@ Every TIL entry must follow these rules:
 - **Tags**: 1-3 lowercase tags from the technical domain (`go`, `rails`, `postgresql`, `css`, `linux`). No generic tags like `programming` or `til`.
 - **Lang**: Detect from content. Chinese -> `zh-CN`, Traditional Chinese -> `zh-TW`, English -> `en`, Japanese -> `ja`, Korean -> `ko`.
 - **Category**: Do not auto-infer `category_name` -- only include it if the user explicitly specifies a category/topic.
+- **Summary**: 1-2 sentences, plain text (no markdown). Max 500 chars and must be shorter than the content body. Same language as content. Self-contained: the reader should understand the core takeaway from the summary alone. Be specific about what the reader will learn, not meta ("this article discusses..."). No first person, no meta-descriptions. Omit if the content is already very short (under ~200 chars) -- the excerpt fallback is sufficient.
 
 ## Result Messages
 
@@ -512,6 +516,7 @@ When the API is unavailable or no token is configured, drafts are saved locally 
 title: "Go interfaces are satisfied implicitly"
 tags: [go, interfaces]
 lang: en
+summary: "Go types implement interfaces implicitly by implementing their methods, with no explicit declaration needed."
 ---
 
 In Go, a type implements an interface...

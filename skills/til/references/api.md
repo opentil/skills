@@ -25,6 +25,7 @@ All fields are nested under `entry`. Additionally, `tag_names` and `category_nam
 | `published` | boolean | no | `false` for draft (default), `true` to publish immediately. |
 | `published_at` | datetime | no | ISO 8601 timestamp. Only relevant when publishing. |
 | `visibility` | string | no | `public` (default), `unlisted`, or `private` |
+| `summary` | string | no | AI-generated summary for listing pages (max 500 chars) |
 | `meta_description` | string | no | SEO meta description |
 | `meta_image` | string | no | URL for social sharing image |
 | `lang` | string | no | Language code (see Supported Languages below) |
@@ -47,6 +48,7 @@ All fields are nested under `entry`. Additionally, `tag_names` and `category_nam
   "first_published_at": null,
   "visibility": "public",
   "hidden": false,
+  "summary": null,
   "meta_description": null,
   "meta_image": null,
   "lang": "en",

@@ -25,6 +25,7 @@ The slug is derived from the title (lowercase, hyphens, no special chars, max 50
 title: "Go interfaces are satisfied implicitly"
 tags: [go, interfaces]
 lang: en
+summary: "Go types implement interfaces implicitly by implementing their methods, with no explicit declaration needed."
 source: human
 agent_name: Claude Code
 agent_model: Claude Opus 4.6
@@ -41,6 +42,7 @@ There is no explicit `implements` keyword...
 | `title` | string | Entry title |
 | `tags` | array | Tag list |
 | `lang` | string | Language code |
+| `summary` | string | AI-generated summary for listing pages (max 500 chars) |
 | `source` | string | `human` (from `/til`) or `agent` (from auto-detection) |
 | `agent_name` | string | Agent display name, e.g. `Claude Code` (optional) |
 | `agent_model` | string | Human-readable model name, e.g. `Claude Opus 4.6` (optional) |
