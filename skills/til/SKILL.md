@@ -406,7 +406,7 @@ Every TIL entry must follow these rules:
 - **One insight per entry**: Each TIL teaches exactly ONE thing. If there are multiple insights, create separate entries.
 - **Concrete examples**: Include code snippets, commands, or specific data whenever relevant. Avoid vague descriptions.
 - **Title**: 5-15 words. Descriptive, same language as content. No "TIL:" prefix.
-- **Content**: Use the most efficient format for the knowledge — tables for comparisons (before/after, options, flags), code blocks for examples, lists for enumerations. Only use prose when explaining causation or context. Never pad content; if one sentence suffices, don't write a paragraph.
+- **Content**: Use the most efficient format for the knowledge — tables for comparisons, code blocks for examples, lists for enumerations, math (`$inline$` / `$$display$$`) for formulas with fractions/subscripts/superscripts/greek letters, Mermaid diagrams (` ```mermaid `) for flows/states/sequences that text cannot clearly express. Simple expressions like `O(n)` stay as inline code; use math only when notation complexity warrants it. Only use prose when explaining causation or context. Never pad content; if one sentence suffices, don't write a paragraph.
 - **Tags**: 1-3 lowercase tags from the technical domain (`go`, `rails`, `postgresql`, `css`, `linux`). No generic tags like `programming` or `til`.
 - **Lang**: Detect from content. Chinese -> `zh-CN`, Traditional Chinese -> `zh-TW`, English -> `en`, Japanese -> `ja`, Korean -> `ko`.
 - **Category**: Do not auto-infer `category_name` -- only include it if the user explicitly specifies a category/topic.
@@ -524,6 +524,6 @@ In Go, a type implements an interface...
 - Entries are published immediately by default (`published: true`) -- use `/til unpublish <id>` to revert to draft
 - The API auto-generates a URL slug from the title
 - Tags are created automatically if they don't exist on the site
-- Content is rendered to HTML server-side (Markdown with syntax highlighting)
+- Content is rendered to HTML server-side (GFM Markdown with syntax highlighting, KaTeX math, and Mermaid diagrams)
 - Management subcommands (`list`, `publish`, `edit`, `search`, `delete`, `tags`, `categories`, `sync`, `batch`) require a token -- no local fallback. Exception: `status` and `auth` work without a token.
 - Scope errors map to specific scopes: `list`/`search`/`tags`/`categories` need `read:entries`, `publish`/`unpublish`/`edit`/`sync`/`batch` need `write:entries`, `delete` needs `delete:entries`. `status` uses `read:entries` when available but works without a token.
