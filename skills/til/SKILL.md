@@ -9,7 +9,7 @@ homepage: https://opentil.ai
 license: MIT
 metadata:
   author: opentil
-  version: "1.9.0"
+  version: "1.10.0"
   primaryEnv: OPENTIL_TOKEN
 ---
 
