@@ -137,7 +137,10 @@ Every `/til` invocation follows this flow:
 1. **Generate** -- craft the TIL entry (title, body, summary, tags, lang)
 2. **Check token** -- resolve token (env var → `~/.til/credentials`)
    - **Found** -> POST to API with `published: true` -> show published URL
-   - **Not found** -> save to `~/.til/drafts/` -> show first-run setup guide
+   - **Not found** -> save to `~/.til/drafts/` -> show first-run guide with connect prompt
+   - **401 response** -> save locally -> inline re-authentication (see Error Handling):
+     - Token from `~/.til/credentials` or no prior token: prompt to reconnect via device flow → on success, auto-retry the original operation
+     - Token from `$OPENTIL_TOKEN` env var: cannot auto-fix — guide user to update/unset the variable
 3. **Never lose content** -- the entry is always persisted somewhere
 4. **On API failure** -> save locally as draft (fallback unchanged)
 
@@ -457,7 +460,7 @@ If the user declines, keep the local files and do not ask again in this session.
 
 ### First Run (no token)
 
-Save the draft locally, then show a concise setup hint. This is NOT an error -- the user successfully captured a TIL.
+Save the draft locally, then proactively offer to connect. This is NOT an error -- the user successfully captured a TIL.
 
 ```
 TIL captured
@@ -466,10 +469,14 @@ TIL captured
   Tags:   go, interfaces
   File:   ~/.til/drafts/20260210-143022-go-interfaces.md
 
-Sync to OpenTIL? Run: /til auth
+Connect to OpenTIL to publish entries online.
+Connect now? (y/n)
 ```
 
-Only show the setup hint on the **first** local save in this session. On subsequent saves, use the short form:
+- `y` → run inline device flow (same as `/til auth`) → on success, sync the just-saved draft + any other pending drafts in `~/.til/drafts/`
+- `n` → show manual setup instructions (see Manual Setup Instructions below)
+
+Only show the connect prompt on the **first** local save in this session. On subsequent saves, use the short form (no prompt):
 
 ```
 TIL captured
@@ -485,14 +492,33 @@ TIL captured
 
 **422 -- Validation error:** Analyze the error response, fix the issue (e.g. truncate title to 200 chars, correct lang code), and retry. Only save locally if the retry also fails.
 
-**401 -- Token invalid or expired:**
+**401 -- Token invalid or expired (token from `~/.til/credentials`):**
 
 ```
-TIL captured (saved locally -- token expired)
+TIL captured (saved locally)
 
   File: ~/.til/drafts/20260210-143022-go-interfaces.md
 
-Token expired. Run /til auth to reconnect.
+Token expired. Reconnect now? (y/n)
+```
+
+- `y` → run inline device flow (same as `/til auth`) → on success, auto-retry the original POST (publish the just-saved draft, then delete the local file)
+- `n` → show manual setup instructions (see Manual Setup Instructions below)
+
+**401 -- Token invalid or expired (token from `$OPENTIL_TOKEN` env var):**
+
+The env var takes priority over `~/.til/credentials`, so saving a new token via device flow would not help — the env var would still be used. Guide the user instead:
+
+```
+TIL captured (saved locally)
+
+  File: ~/.til/drafts/20260210-143022-go-interfaces.md
+
+Your $OPENTIL_TOKEN is expired or invalid. To fix:
+  • Update the variable with a new token, or
+  • unset OPENTIL_TOKEN, then run /til auth
+
+Create a new token: https://opentil.ai/dashboard/settings/tokens
 ```
 
 **Network failure or 5xx:**
@@ -504,6 +530,27 @@ TIL captured (saved locally -- API unavailable)
 ```
 
 > Full error codes, 422 auto-fix logic, and rate limit details: see references/api.md
+
+### Re-authentication Safeguards
+
+| Rule | Behavior |
+|------|----------|
+| No retry loops | If re-auth succeeds but the retry still returns 401 → stop and show the error. Do not re-authenticate again. |
+| Batch-aware | During batch/sync operations, re-authenticate at most once. On success, continue processing remaining items with the new token. |
+| Respect refusal | If the user declines re-authentication (`n`), do not prompt again for the rest of this session. Use the short local-save format silently. |
+| Env var awareness | When the active token comes from `$OPENTIL_TOKEN`, never attempt device flow — it cannot override the env var. Always show the env var guidance instead. |
+
+### Manual Setup Instructions
+
+When the user declines inline authentication (answers `n`), show:
+
+```
+Or set up manually:
+  1. Visit https://opentil.ai/dashboard/settings/tokens
+  2. Create a token (select read + write + delete scopes)
+  3. Add to shell profile:
+     export OPENTIL_TOKEN="til_..."
+```
 
 ## Local Draft Fallback
 
@@ -526,6 +573,7 @@ In Go, a type implements an interface...
 
 ## Notes
 
+- **UI language adaptation**: All prompts, result messages, and error messages in this document are written in English as canonical examples. At runtime, adapt them to match the user's language in the current session (e.g. if the user writes in Chinese, display messages in Chinese). Entry content language (`lang` field) is independent -- it is always detected from the content itself.
 - Entries are published immediately by default (`published: true`) -- use `/til unpublish <id>` to revert to draft
 - The API auto-generates a URL slug from the title
 - Tags are created automatically if they don't exist on the site

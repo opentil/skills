@@ -198,7 +198,7 @@ Returns the full EntrySerializer response with `published: false`.
 
 | Status | Code | Action |
 |--------|------|--------|
-| 401 | `unauthorized` | Token invalid or expired. Save locally. Show: `Token expired. Run /til auth to reconnect.` |
+| 401 | `unauthorized` | Token invalid or expired. Save locally (for capture commands). Then follow the inline re-authentication flow defined in SKILL.md Error Handling — prompt to reconnect if token is from `~/.til/credentials`, or show env var guidance if from `$OPENTIL_TOKEN`. |
 | 403 | `insufficient_scope` | Token lacks required scope. Show which scope is needed. |
 | 404 | `not_found` | Entry does not exist or belongs to another user. |
 | 422 | `validation_failed` | Parse `details` array, auto-fix, and retry once. Save locally if retry fails. |

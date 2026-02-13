@@ -6,10 +6,23 @@ Detailed reference for TIL entry management via `/til` subcommands.
 
 - **Token required**: All management subcommands require a token (env var or `~/.til/credentials`), except `/til status` and `/til auth` which work without a token. There is no local fallback — management operations are API-only.
 - **No local fallback**: Unlike `/til <content>` which can save locally, management commands need live API access.
-- **Missing token**: Show a clear error (except for `status` and `auth`):
+- **Missing token**: Proactively offer to connect (except for `status` and `auth`):
 
 ```
-Token required. Run /til auth to connect.
+Token required.
+
+Connect now? (y/n)
+```
+
+- `y` → run inline device flow (same as `/til auth`) → on success, execute the original management command
+- `n` → show manual setup instructions:
+
+```
+Or set up manually:
+  1. Visit https://opentil.ai/dashboard/settings/tokens
+  2. Create a token (select read + write + delete scopes)
+  3. Add to shell profile:
+     export OPENTIL_TOKEN="til_..."
 ```
 
 ## Scope Requirements
@@ -526,9 +539,35 @@ Failed entries are saved locally to `~/.til/drafts/` (same as normal capture fal
 
 ### Missing Token
 
+See Prerequisites above — proactively offer to connect via device flow.
+
+### 401 -- Token Invalid or Expired
+
+Management commands have no local fallback, so the user cannot proceed without a valid token. Apply the same token-source-aware flow as SKILL.md:
+
+**Token from `~/.til/credentials`:**
+
 ```
-Token required. Run /til auth to connect.
+Token expired. Reconnect now? (y/n)
 ```
+
+- `y` → run inline device flow → on success, auto-retry the original management command
+- `n` → show manual setup instructions (same as Prerequisites section)
+
+**Token from `$OPENTIL_TOKEN` env var:**
+
+```
+Your $OPENTIL_TOKEN is expired or invalid. To fix:
+  • Update the variable with a new token, or
+  • unset OPENTIL_TOKEN, then run /til auth
+
+Create a new token: https://opentil.ai/dashboard/settings/tokens
+```
+
+**Safeguards** (same as SKILL.md):
+- If re-auth succeeds but retry still returns 401 → stop and show the error
+- During batch operations, re-authenticate at most once, then continue remaining items
+- If the user declines (`n`), do not prompt again this session
 
 ### Insufficient Scope (403)
 
