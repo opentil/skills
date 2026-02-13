@@ -410,3 +410,56 @@ Content-Type: application/json
 | `slow_down` | Polling too fast | Increase interval by 5 seconds |
 | `expired_token` | Device code expired | Stop polling, show timeout message |
 | `invalid_grant` | Invalid device code | Stop polling, show error |
+
+## Credential Storage
+
+After a successful device flow, credentials are stored locally in `~/.til/credentials` as YAML.
+
+### File Format
+
+```yaml
+active: personal
+profiles:
+  personal:
+    token: til_abc...
+    nickname: hong
+    site_url: https://opentil.ai/@hong
+    host: https://opentil.ai
+  work:
+    token: til_xyz...
+    nickname: hong-corp
+    site_url: https://opentil.ai/@hong-corp
+    host: https://opentil.ai
+```
+
+### Field Reference
+
+| Field | Level | Description |
+|-------|-------|-------------|
+| `active` | top | Name of the currently active profile |
+| `profiles` | top | Map of profile name → profile object |
+| `token` | profile | Bearer token (starts with `til_`) |
+| `nickname` | profile | Username from `GET /site` response (`username` field) |
+| `site_url` | profile | Public site URL, e.g. `https://opentil.ai/@hong` |
+| `host` | profile | API host, e.g. `https://opentil.ai` |
+
+### Backward Compatibility
+
+Old format (`~/.til/credentials` containing only a plain text token):
+
+```
+til_abc123...
+```
+
+On first read, detect the old format (file content starts with `til_` and contains no YAML structure). Migrate automatically:
+
+1. Read the token string
+2. `GET /site` with the token to fetch `username`
+   - On success: use `username` as profile name, populate `nickname` and `site_url`
+   - On failure (401/network): use `default` as profile name, leave `nickname` and `site_url` empty
+3. Write back as YAML with the single profile set as `active`
+4. Preserve file permissions (`chmod 600`)
+
+### File Permissions
+
+Always set `~/.til/credentials` to `chmod 600` (owner read/write only) after any write operation. Create `~/.til/` directory with `chmod 700` if it doesn't exist.

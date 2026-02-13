@@ -4,7 +4,7 @@ Detailed reference for TIL entry management via `/til` subcommands.
 
 ## Prerequisites
 
-- **Token required**: All management subcommands require a token (env var or `~/.til/credentials`), except `/til status` and `/til auth` which work without a token. There is no local fallback — management operations are API-only.
+- **Token required**: All management subcommands require a token (env var or active profile in `~/.til/credentials`), except `/til status`, `/til auth`, and profile management commands (`auth switch|list|remove|rename`) which work without a token. There is no local fallback — management operations are API-only.
 - **No local fallback**: Unlike `/til <content>` which can save locally, management commands need live API access.
 - **Missing token**: Proactively offer to connect (except for `status` and `auth`):
 
@@ -40,6 +40,10 @@ Or set up manually:
 | `tags` | `read:entries` | `GET /tags?sort=popular` |
 | `categories` | `read:entries` | `GET /categories` |
 | `batch` | `write:entries` | `POST /entries` (per topic) |
+| `auth switch` | none | local file only (+ `GET /site` to verify) |
+| `auth list` | none | local file only |
+| `auth remove` | none | local file only |
+| `auth rename` | none | local file only |
 
 When a 403 `insufficient_scope` error is returned, map the subcommand to the needed scope:
 
@@ -270,7 +274,22 @@ Deleted.
 
 Show site status and connection info. **Special: works without a token** (degraded display).
 
-**With token** -- `GET /site`:
+**With token (≥2 profiles)** -- `GET /site`:
+
+```
+OpenTIL Status
+
+  Profile:  personal (active)
+  Site:     @hong (opentil.ai/@hong)
+  Entries:  28 total (15 published, 13 drafts)
+  Token:    til_...a3f2 ✓
+  Local:    1 draft pending sync
+  Profiles: 2 configured (/til auth list)
+
+  Manage: https://opentil.ai/dashboard
+```
+
+**With token (single profile)** -- `GET /site`:
 
 ```
 OpenTIL Status
@@ -283,10 +302,25 @@ OpenTIL Status
   Manage: https://opentil.ai/dashboard
 ```
 
+**With token (env var override)** -- `GET /site`:
+
+```
+OpenTIL Status
+
+  Site:     @hong (opentil.ai/@hong)
+  Entries:  28 total (15 published, 13 drafts)
+  Token:    til_...a3f2 ✓ (env override)
+  Local:    1 draft pending sync
+
+  Manage: https://opentil.ai/dashboard
+```
+
+- `Profile` line: only shown when ≥2 profiles exist. Shows `name (active)`.
 - `Site` line: `@username` + public URL
 - `Entries` line: `entries_count` (total), `published_entries_count` (published), difference = drafts
-- `Token` line: last 4 chars of the resolved token + `✓`
+- `Token` line: last 4 chars of the resolved token + `✓`. Append `(env override)` when token comes from `$OPENTIL_TOKEN`.
 - `Local` line: count of `*.md` files in `~/.til/drafts/`
+- `Profiles` line: only shown when ≥2 profiles exist. Shows count + hint to `/til auth list`.
 - `Manage` link: dashboard URL
 
 **Without token:**
@@ -320,7 +354,8 @@ Connect an OpenTIL account via Device Flow (browser-based authorization). **Work
 **Flow:**
 
 1. **Check existing connection**
-   - Resolve token (env var → `~/.til/credentials`)
+   - Resolve token (env var → active profile in `~/.til/credentials`)
+   - If `~/.til/credentials` exists in old plain-text format, migrate to YAML `default` profile first
    - If token found, `GET /site` to verify:
      - Valid: `"Already connected as @{username}. Re-authorize? (y/n)"`
        - `y` → continue to new authorization
@@ -355,15 +390,26 @@ Waiting for authorization...
      - 200 → extract `access_token`
    - Hard timeout: 300 seconds (5 minutes)
 
-5. **On success**
+5. **On success — save as named profile**
    - Create `~/.til/` directory if it doesn't exist
-   - Write token to `~/.til/credentials` (plain text, `chmod 600`)
+   - `GET /site` with the new token to fetch `username` (nickname)
+   - Determine profile name: use the API-returned `username` as the default profile name
+     - If a profile with the same name already exists and its token differs, append a numeric suffix (`hong-2`, `hong-3`, etc.)
+     - If re-authorizing the current active profile (same nickname), update the existing profile's token in-place
+   - Write `~/.til/credentials` in YAML format (`chmod 600`):
+     - Set `active` to the new profile name
+     - Add/update the profile under `profiles` with `token`, `nickname`, `site_url`, `host`
    - Display:
 
 ```
-✓ Connected to OpenTIL
-  Token saved to ~/.til/credentials
+✓ Connected as @hong
+  Profile "hong" saved to ~/.til/credentials
 ```
+
+   - If other profiles already exist, and this is a new profile (not re-auth), ask whether to switch:
+     - `"Switch to @hong (hong)? (y/n)"` — default yes
+     - `y` or new profile → set as active
+     - `n` → keep current active profile
 
    - Check `~/.til/drafts/` for local drafts
    - If drafts exist: `"Found N local drafts. Sync now? (y/n)"`
@@ -390,6 +436,139 @@ Unable to reach OpenTIL. Check your connection and try again.
 | Browser didn't open | Display fallback URL + manual code entry |
 | User cancels in browser | Polling times out, show timeout message |
 | Token obtained + local drafts exist | Offer to sync |
+| Old plain-text credentials file | Migrate to YAML `default` profile before proceeding |
+| Re-auth same account | Update existing profile's token in-place |
+| Auth new account, profiles exist | Ask whether to switch to new profile |
+
+### `/til auth switch [name]`
+
+Switch the active profile. **Works without a token** (operates on local `~/.til/credentials` only).
+
+**No argument — interactive selection:**
+
+```
+Profiles:
+  1. personal  @hong        opentil.ai/@hong       (active)
+  2. work      @hong-corp   opentil.ai/@hong-corp
+
+Switch to: (1/2)
+```
+
+User picks a number → update `active` field in `~/.til/credentials` → verify token with `GET /site`:
+- Valid: `Switched to @hong-corp (work)`
+- Invalid (401): `Switched to @hong-corp (work) — token expired, run /til auth to reconnect`
+
+**With argument:**
+
+`/til auth switch work` or `/til auth switch hong-corp` → directly switch, no interactive prompt.
+
+Name resolution order:
+1. Exact match on profile name → use it
+2. Exact match on nickname (with or without `@` prefix) → use that profile
+3. No match → show error with available profiles
+
+Examples:
+- `/til auth switch work` → matches profile name "work"
+- `/til auth switch hong-corp` → matches nickname "hong-corp"
+- `/til auth switch @hong-corp` → matches nickname "hong-corp" (strips `@`)
+
+- Match found → switch and verify (same as above)
+- No match:
+
+```
+Profile "xyz" not found.
+
+Available profiles:
+  * personal  @hong        opentil.ai/@hong
+
+Use /til auth to add a new account.
+```
+
+**No profiles configured:**
+
+```
+No profiles configured. Run /til auth to connect.
+```
+
+### `/til auth list`
+
+List all configured profiles. **Works without a token.**
+
+```
+Profiles:
+  * personal  @hong        opentil.ai/@hong
+    work      @hong-corp   opentil.ai/@hong-corp
+```
+
+- `*` marks the active profile
+- Columns: profile name, `@nickname`, site URL
+
+**No profiles:**
+
+```
+No profiles configured. Run /til auth to connect.
+```
+
+**With env var override:**
+
+```
+Profiles:
+  * personal  @hong        opentil.ai/@hong
+    work      @hong-corp   opentil.ai/@hong-corp
+
+  Token override: $OPENTIL_TOKEN is set (overrides active profile)
+```
+
+### `/til auth remove <name>`
+
+Remove a profile from `~/.til/credentials`. **Works without a token.**
+
+**Cannot remove active profile (when other profiles exist):**
+
+```
+Cannot remove "personal" — it is the active profile.
+Switch to another profile first: /til auth switch <name>
+```
+
+**Last remaining profile:** Can be removed even if active (special case — returns to "not connected" state).
+
+**Confirmation:**
+
+```
+Remove profile "work" (@hong-corp)? (y/n)
+```
+
+- `y` → remove from `profiles` map, write back `~/.til/credentials`
+- `n` → cancel
+
+When the last profile is removed, `~/.til/credentials` is cleared (empty `profiles` map, no `active` field).
+
+**Profile not found:**
+
+```
+Profile "work" not found. Use /til auth list to see profiles.
+```
+
+### `/til auth rename <old> <new>`
+
+Rename a profile. **Works without a token.**
+
+```
+Renamed "personal" → "home"
+```
+
+- If the renamed profile is the active profile, update the `active` field accordingly
+- If `<new>` already exists:
+
+```
+Profile "home" already exists. Choose a different name.
+```
+
+- If `<old>` not found:
+
+```
+Profile "personal" not found. Use /til auth list to see profiles.
+```
 
 ### `/til sync`
 
@@ -545,13 +724,15 @@ See Prerequisites above — proactively offer to connect via device flow.
 
 Management commands have no local fallback, so the user cannot proceed without a valid token. Apply the same token-source-aware flow as SKILL.md:
 
-**Token from `~/.til/credentials`:**
+**Token from `~/.til/credentials` (active profile):**
 
 ```
 Token expired. Reconnect now? (y/n)
 ```
 
-- `y` → run inline device flow → on success, auto-retry the original management command
+When ≥2 profiles exist, include the profile identity: `Token expired for @hong (personal). Reconnect now? (y/n)`
+
+- `y` → run inline device flow → on success, update the active profile's token in `~/.til/credentials` and auto-retry the original management command
 - `n` → show manual setup instructions (same as Prerequisites section)
 
 **Token from `$OPENTIL_TOKEN` env var:**

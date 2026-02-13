@@ -29,6 +29,7 @@ summary: "Go types implement interfaces implicitly by implementing their methods
 source: human
 agent_name: Claude Code
 agent_model: Claude Opus 4.6
+profile: personal
 ---
 
 In Go, a type implements an interface by implementing its methods.
@@ -46,8 +47,11 @@ There is no explicit `implements` keyword...
 | `source` | string | `human` (from `/til`) or `agent` (from auto-detection) |
 | `agent_name` | string | Agent display name, e.g. `Claude Code` (optional) |
 | `agent_model` | string | Human-readable model name, e.g. `Claude Opus 4.6` (optional) |
+| `profile` | string | Active profile name at save time (optional). Used during sync to determine which account's token to use. Omitted when no profiles are configured. |
 
 The `source`, `agent_name`, and `agent_model` fields preserve attribution so that when syncing to the API, the correct headers and tags can be applied.
+
+The `profile` field ensures drafts are synced to the correct account in multi-profile setups.
 
 ## Sync Protocol
 
@@ -73,16 +77,22 @@ Wait for user confirmation. If the user declines, do not ask again this session.
 
 For each `.md` file in `~/.til/drafts/`:
 
-1. Parse the frontmatter (title, tags, lang, source, agent_name, agent_model)
-2. Read the content body (everything after the second `---`)
-3. POST to API:
+1. Parse the frontmatter (title, tags, lang, source, agent_name, agent_model, profile)
+2. **Resolve token for this draft** (profile matching):
+   - If `$OPENTIL_TOKEN` is set → always use it (env var overrides all profiles)
+   - If `profile` field is present → look up that profile's token in `~/.til/credentials`
+     - Profile found → use its token
+     - Profile not found → skip this draft, report: `Skipped: profile "work" not found (/til auth list)`
+   - If `profile` field is absent (old drafts) → use the current active profile's token
+3. Read the content body (everything after the second `---`)
+4. POST to API (using the resolved token):
    - Set `published: false`
    - Set `X-OpenTIL-Source` header based on `source` field
    - Set `X-OpenTIL-Agent` header from `agent_name` field (if present)
    - Set `X-OpenTIL-Model` header from `agent_model` field (if present)
    - Add `agent-assisted` tag if `source` is `agent`
-4. On 201 success: delete the local file
-5. On failure: keep the local file, record the error
+5. On 201 success: delete the local file
+6. On failure: keep the local file, record the error
 
 ### Step 4: Report Results
 

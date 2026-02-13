@@ -30,10 +30,35 @@ export OPENTIL_TOKEN="til_xxx"
 ### Token Resolution
 
 Token resolution order:
-1. `$OPENTIL_TOKEN` environment variable
-2. `~/.til/credentials` file (created by `/til auth`)
+1. `$OPENTIL_TOKEN` environment variable (overrides all profiles)
+2. `~/.til/credentials` file — active profile's token (created by `/til auth`)
 
 If neither is set, entries are saved locally to `~/.til/drafts/`.
+
+### Credential File Format
+
+`~/.til/credentials` stores named profiles in YAML:
+
+```yaml
+active: personal
+profiles:
+  personal:
+    token: til_abc...
+    nickname: hong
+    site_url: https://opentil.ai/@hong
+    host: https://opentil.ai
+  work:
+    token: til_xyz...
+    nickname: hong-corp
+    site_url: https://opentil.ai/@hong-corp
+    host: https://opentil.ai
+```
+
+- `active`: name of the currently active profile
+- `profiles`: map of profile name → credentials
+- Each profile stores: `token`, `nickname` (from API), `site_url`, `host`
+
+**Backward compatibility**: If `~/.til/credentials` contains a plain text token (old format), silently migrate it to a `default` profile in YAML format and write back.
 
 ## Subcommand Routing
 
@@ -53,6 +78,10 @@ The first word after `/til` determines the action. Reserved words route to manag
 | `/til categories` | List site categories |
 | `/til batch <topics>` | Batch-capture multiple TIL entries |
 | `/til auth` | Connect OpenTIL account (browser auth) |
+| `/til auth switch [name]` | Switch active profile (by profile name or @nickname) |
+| `/til auth list` | List all profiles |
+| `/til auth remove <name>` | Remove a profile |
+| `/til auth rename <old> <new>` | Rename a profile |
 | `/til <anything else>` | Capture content as a new TIL |
 | `/til` | Extract insights from conversation (multi-candidate) |
 
@@ -72,6 +101,7 @@ Reserved words: `list`, `publish`, `unpublish`, `edit`, `search`, `delete`, `sta
 | `/til publish\|unpublish\|edit\|search\|delete\|batch` | [references/management.md](references/management.md) |
 | `/til sync` | [references/management.md](references/management.md), [references/local-drafts.md](references/local-drafts.md) |
 | `/til auth` | [references/management.md](references/management.md), [references/api.md](references/api.md) |
+| `/til auth switch\|list\|remove\|rename` | [references/management.md](references/management.md) |
 
 ### On-demand (load only when the situation arises):
 
@@ -135,14 +165,16 @@ curl -X POST "https://opentil.ai/api/v1/entries" \
 Every `/til` invocation follows this flow:
 
 1. **Generate** -- craft the TIL entry (title, body, summary, tags, lang)
-2. **Check token** -- resolve token (env var → `~/.til/credentials`)
+2. **Check token** -- resolve token (env var → active profile in `~/.til/credentials`)
+   - If `~/.til/credentials` exists in old plain-text format, migrate to YAML `default` profile first
    - **Found** -> POST to API with `published: true` -> show published URL
    - **Not found** -> save to `~/.til/drafts/` -> show first-run guide with connect prompt
    - **401 response** -> save locally -> inline re-authentication (see Error Handling):
-     - Token from `~/.til/credentials` or no prior token: prompt to reconnect via device flow → on success, auto-retry the original operation
+     - Token from `~/.til/credentials` (active profile) or no prior token: prompt to reconnect via device flow → on success, update the active profile's token and auto-retry the original operation
      - Token from `$OPENTIL_TOKEN` env var: cannot auto-fix — guide user to update/unset the variable
-3. **Never lose content** -- the entry is always persisted somewhere
-4. **On API failure** -> save locally as draft (fallback unchanged)
+3. **Show identity** -- when ≥2 profiles are configured, include `Account: @nickname (profile_name)` in result messages so the user always knows which account was used
+4. **Never lose content** -- the entry is always persisted somewhere
+5. **On API failure** -> save locally as draft (fallback unchanged)
 
 ## `/til <content>` -- Explicit Capture
 
@@ -349,7 +381,9 @@ Batch-capture multiple TIL entries in one invocation. Requires explicit topic li
 
 ### Session State
 
-Track `last_created_entry_id` -- set on every successful `POST /entries` (201). Used by `/til publish last`. Not persisted across sessions.
+Track the following session state (not persisted across sessions):
+- `last_created_entry_id` -- set on every successful `POST /entries` (201). Used by `/til publish last`.
+- `active_profile` -- the profile name resolved at first token access. Reflects the `active` field from `~/.til/credentials` (or `$OPENTIL_TOKEN` override). Used for identity display and draft attribution.
 
 > Detailed subcommand flows, display formats, and error handling: see references/management.md
 
@@ -430,6 +464,19 @@ Published to OpenTIL
   URL:    https://opentil.ai/@username/go-interfaces-are-satisfied-implicitly
 ```
 
+When ≥2 profiles are configured, add an `Account` line:
+
+```
+Published to OpenTIL
+
+  Account: @hong (personal)
+  Title:   Go interfaces are satisfied implicitly
+  Tags:    go, interfaces
+  URL:     https://opentil.ai/@hong/go-interfaces-are-satisfied-implicitly
+```
+
+Single-profile users see no `Account` line — keep the output clean.
+
 Extract the `url` field from the API response for the URL.
 
 ### Sync Local Drafts
@@ -492,18 +539,20 @@ TIL captured
 
 **422 -- Validation error:** Analyze the error response, fix the issue (e.g. truncate title to 200 chars, correct lang code), and retry. Only save locally if the retry also fails.
 
-**401 -- Token invalid or expired (token from `~/.til/credentials`):**
+**401 -- Token invalid or expired (token from `~/.til/credentials` active profile):**
 
 ```
 TIL captured (saved locally)
 
   File: ~/.til/drafts/20260210-143022-go-interfaces.md
 
-Token expired. Reconnect now? (y/n)
+Token expired for @hong (personal). Reconnect now? (y/n)
 ```
 
-- `y` → run inline device flow (same as `/til auth`) → on success, auto-retry the original POST (publish the just-saved draft, then delete the local file)
+- `y` → run inline device flow (same as `/til auth`) → on success, update the active profile's token in `~/.til/credentials` and auto-retry the original POST (publish the just-saved draft, then delete the local file)
 - `n` → show manual setup instructions (see Manual Setup Instructions below)
+
+When only one profile exists, omit the `@nickname (profile)` from the message.
 
 **401 -- Token invalid or expired (token from `$OPENTIL_TOKEN` env var):**
 
@@ -539,6 +588,7 @@ TIL captured (saved locally -- API unavailable)
 | Batch-aware | During batch/sync operations, re-authenticate at most once. On success, continue processing remaining items with the new token. |
 | Respect refusal | If the user declines re-authentication (`n`), do not prompt again for the rest of this session. Use the short local-save format silently. |
 | Env var awareness | When the active token comes from `$OPENTIL_TOKEN`, never attempt device flow — it cannot override the env var. Always show the env var guidance instead. |
+| Profile-aware re-auth | On successful re-authentication, update the corresponding profile's token in `~/.til/credentials`. Do not create a new profile. |
 
 ### Manual Setup Instructions
 
@@ -564,10 +614,13 @@ title: "Go interfaces are satisfied implicitly"
 tags: [go, interfaces]
 lang: en
 summary: "Go types implement interfaces implicitly by implementing their methods, with no explicit declaration needed."
+profile: personal
 ---
 
 In Go, a type implements an interface...
 ```
+
+The `profile` field records the active profile name at save time, ensuring sync uses the correct account's token. Omitted when no profiles are configured (backward-compatible).
 
 > Full directory structure, metadata fields, and sync protocol: see references/local-drafts.md
 
@@ -578,5 +631,5 @@ In Go, a type implements an interface...
 - The API auto-generates a URL slug from the title
 - Tags are created automatically if they don't exist on the site
 - Content is rendered to HTML server-side (GFM Markdown with syntax highlighting, KaTeX math, and Mermaid diagrams)
-- Management subcommands (`list`, `publish`, `edit`, `search`, `delete`, `tags`, `categories`, `sync`, `batch`) require a token -- no local fallback. Exception: `status` and `auth` work without a token.
+- Management subcommands (`list`, `publish`, `edit`, `search`, `delete`, `tags`, `categories`, `sync`, `batch`) require a token -- no local fallback. Exception: `status` and `auth` (including `auth switch`, `auth list`, `auth remove`, `auth rename`) work without a token.
 - Scope errors map to specific scopes: `list`/`search`/`tags`/`categories` need `read:entries`, `publish`/`unpublish`/`edit`/`sync`/`batch` need `write:entries`, `delete` needs `delete:entries`. `status` uses `read:entries` when available but works without a token.
