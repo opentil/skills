@@ -284,6 +284,7 @@ OpenTIL Status
   Entries:  28 total (15 published, 13 drafts)
   Token:    til_...a3f2 ✓
   Local:    1 draft pending sync
+  Skill:    v1.11.0 (latest)
   Profiles: 2 configured (/til auth list)
 
   Manage: https://opentil.ai/dashboard
@@ -298,6 +299,7 @@ OpenTIL Status
   Entries:  28 total (15 published, 13 drafts)
   Token:    til_...a3f2 ✓
   Local:    1 draft pending sync
+  Skill:    v1.11.0 (latest)
 
   Manage: https://opentil.ai/dashboard
 ```
@@ -311,6 +313,7 @@ OpenTIL Status
   Entries:  28 total (15 published, 13 drafts)
   Token:    til_...a3f2 ✓ (env override)
   Local:    1 draft pending sync
+  Skill:    v1.11.0 (latest)
 
   Manage: https://opentil.ai/dashboard
 ```
@@ -320,6 +323,11 @@ OpenTIL Status
 - `Entries` line: `entries_count` (total), `published_entries_count` (published), difference = drafts
 - `Token` line: last 4 chars of the resolved token + `✓`. Append `(env override)` when token comes from `$OPENTIL_TOKEN`.
 - `Local` line: count of `*.md` files in `~/.til/drafts/`
+- `Skill` line: Read version from this skill's metadata (in frontmatter `metadata.version`). Check npm registry:
+  `curl -s --max-time 3 https://registry.npmjs.org/@opentil/cli/latest 2>/dev/null`
+  Parse `version` from JSON response. Compare with metadata version.
+  If newer, show `→ vX.Y.Z available` + update command.
+  If check fails, show version without comparison: `v1.11.0`.
 - `Profiles` line: only shown when ≥2 profiles exist. Shows count + hint to `/til auth list`.
 - `Manage` link: dashboard URL
 
@@ -331,6 +339,7 @@ OpenTIL Status
   Site:     (not connected)
   Token:    not configured
   Local:    3 drafts pending sync
+  Skill:    v1.11.0
 
   Run /til auth to connect
 ```
@@ -343,6 +352,7 @@ OpenTIL Status
   Site:     (unable to connect)
   Token:    til_...a3f2 ✗
   Local:    0 drafts
+  Skill:    v1.11.0
 
   Check token: https://opentil.ai/dashboard/settings/tokens
 ```

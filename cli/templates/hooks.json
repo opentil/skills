@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "ExitPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '[OpenTIL] Consider capturing a TIL from this session with /til'"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '[OpenTIL] If you learned something new, capture it with /til'",
+            "once": true
+          }
+        ]
+      }
+    ]
+  }
+}

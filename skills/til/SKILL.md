@@ -1,16 +1,9 @@
 ---
 name: til
-description: >
-  Capture and manage TIL (Today I Learned) entries on OpenTIL.
-  Use /til <content> to capture, /til to extract insights from conversation,
-  or /til list|publish|edit|search|delete|status|sync|tags|categories|batch to
-  manage entries -- all without leaving the CLI.
+description: Capture and manage TIL (Today I Learned) entries on OpenTIL. Use /til to capture insights, or /til list|publish|edit|search|delete|status|sync|tags|categories|batch|auth to manage entries -- all without leaving the CLI.
 homepage: https://opentil.ai
 license: MIT
-metadata:
-  author: opentil
-  version: "1.11.0"
-  primaryEnv: OPENTIL_TOKEN
+metadata: {"author":"opentil","version":"1.11.0","primaryEnv":"OPENTIL_TOKEN","openclaw":{"emoji":"💡","requires":{"env":["OPENTIL_TOKEN"]}}}
 ---
 
 # til
@@ -532,6 +525,18 @@ TIL captured
   Tags:   go, interfaces
   File:   ~/.til/drafts/20260210-143022-go-interfaces.md
 ```
+
+### Update Hint
+
+After the first successful API call in a conversation, check the installed skill age:
+
+1. Read `~/.opentil/manifest.json` and parse `updatedAt` (ISO timestamp)
+2. If `updatedAt` is more than 30 days ago, append after the success message:
+   ```
+   Tip: Skill installed 45 days ago. Run npx @opentil/cli@latest to check for updates.
+   ```
+3. If the file doesn't exist or can't be parsed, skip silently
+4. Only check once per conversation — do not repeat on subsequent saves
 
 ## Error Handling
 

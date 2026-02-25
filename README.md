@@ -5,8 +5,25 @@ Skills for [OpenTIL](https://opentil.ai) -- capture and manage TIL (Today I Lear
 ## Install
 
 ```bash
-npx skills add opentil/skills@til
+curl -fsSL til.so/i | bash
 ```
+
+This detects your installed AI agents (Claude Code, Cursor, Codex, OpenCode) and installs the TIL skill with per-agent extras.
+
+Or install directly with npx:
+
+```bash
+npx @opentil/cli
+```
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `npx @opentil/cli` | Interactive install / reconfigure |
+| `npx @opentil/cli uninstall` | Clean removal |
+| `npx @opentil/cli doctor` | Health check |
+| `npx @opentil/cli update` | Update instructions |
 
 ## Available Skills
 

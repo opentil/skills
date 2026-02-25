@@ -5,3 +5,8 @@
 .env
 Makefile
 RELEASE.md
+fork.md
+
+# CLI build artifacts
+cli/node_modules/
+cli/dist/
