@@ -15,7 +15,7 @@ if ! command -v node &>/dev/null; then
   echo "    Windows: https://nodejs.org/en/download"
   echo ""
   echo "  Then re-run:"
-  echo "    curl -fsSL til.so/i | bash"
+  echo "    curl -fsSL til.so/install | bash"
   echo ""
   exit 1
 fi
