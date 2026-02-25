@@ -80,16 +80,21 @@ Do not suggest TIL capture for:
                                [CAPTURED]        [DONE_FOR_SESSION]
                                     |
                                     v
-                             [DONE_FOR_SESSION]
+                             [COOLDOWN: 15 turns]
+                                    |
+                              (cooldown expires)
+                                    |
+                                    v
+                                 [IDLE]
 ```
 
 **Constraints checked in EVALUATING state:**
 
-1. Has a suggestion already been made this session? → If yes, stay IDLE
+1. Is the agent in COOLDOWN or DONE_FOR_SESSION? → If yes, stay in current state
 2. Is the user in the middle of active problem-solving? → If yes, stay IDLE
 3. Is this a natural pause point (resolution or task boundary)? → If no, stay IDLE
 
-Once in DONE_FOR_SESSION, the agent never suggests again until a new session starts.
+Once in DONE_FOR_SESSION (declined or ignored), the agent never suggests again until a new session starts. After COOLDOWN expires (15 turns after a captured TIL), the agent returns to IDLE and may suggest again at the next qualifying moment.
 
 ## Suggestion Format
 
@@ -148,4 +153,4 @@ Agent: [Generates full entry: title, body, tags, lang]
 
 The suggestion itself is the candidate. When the user says yes, the agent generates the full entry directly — no extract flow, no draft review step.
 
-If the user ignores the suggestion, says "no", or continues with another topic, treat it as decline. Move on and do not ask again this session.
+If the user ignores the suggestion, says "no", or continues with another topic, treat it as decline. Move on and do not suggest again this session. If the user accepted and the TIL was captured, enter a 15-turn cooldown before the next suggestion can occur.

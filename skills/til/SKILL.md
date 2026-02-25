@@ -173,16 +173,17 @@ Every `/til` invocation follows this flow:
 
 The user's input is **raw material** -- a seed, not the final entry. Generate a complete TIL from it:
 
-- Short input (a sentence or phrase) -> expand into a full entry with context and examples
+- Short but unclear (a few words, ambiguous without context) -> expand into a full entry with context and examples
+- Short but complete (a clear, self-contained statement) -> preserve as-is; add a code example only if it strengthens the entry
 - Long input (a paragraph or more) -> refine and structure, but preserve the user's intent
 
 **Steps:**
 
 1. Treat the user's input as a seed -- craft a complete title + body from it
-2. Generate a concise title (5-15 words) in the same language as the content
+2. Generate a concise title (3-15 words) in the same language as the content
 3. Write a self-contained Markdown body (see Content Guidelines below)
 4. Generate a summary (see Summary Guidelines below)
-5. Infer 1-3 lowercase tags from technical domain (e.g. `rails`, `postgresql`, `go`)
+5. Infer 1-3 lowercase tags (e.g. `rails`, `postgresql`, `go`, `css`)
 6. Detect language -> set `lang` (`en`, `zh-CN`, `zh-TW`, `ja`, `ko`, `es`, `fr`, `de`, `pt-BR`, `pt`, `ru`, `ar`, `bs`, `da`, `nb`, `pl`, `th`, `tr`, `it`)
 7. Follow Execution Flow above (check token -> POST or save locally)
 
@@ -244,7 +245,9 @@ Do NOT suggest for: standard tool usage, documented behavior, typo-caused bugs, 
 
 ### Rate Limiting
 
-1. **Once per session** — after suggesting once (accepted or declined), never suggest again
+1. **Cooldown-based** — after each suggestion, enter a cooldown period before the next one can occur:
+   - **Accepted**: Cooldown of 15 turns. After cooldown, the agent may suggest again at the next qualifying moment.
+   - **Declined or ignored**: No more suggestions for the rest of this session.
 2. **Natural pauses only** — suggest at resolution points or task boundaries, never mid-problem-solving
 3. **Respect rejection** — if declined, move on without persuasion
 
@@ -435,12 +438,18 @@ Every TIL entry must follow these rules:
 - **Self-contained**: The reader must understand the entry without any conversation context. Never write "as we discussed", "the above error", "this project's config", etc.
 - **Desensitized**: Remove project names, company details, colleague names, internal URLs, and proprietary business logic. Generalize specifics: "our User model" -> "a model", "the production server" -> "a production environment", "the Acme payment service" -> "a payment gateway".
 - **Universally valuable**: Write to StackOverflow-answer standards. A stranger searching for this topic should find the entry immediately useful. Content only useful to the author belongs in private notes, not TIL.
-- **Factual tone**: State facts, show examples, explain why. Avoid first-person narrative ("I was debugging...", "I discovered..."). Exception: brief situational context is fine ("When upgrading Rails from 7.2 to 8.0...").
+- **Factual tone**: State facts, show examples, explain why. Avoid extended first-person narrative, but a brief contextual setup is encouraged to ground the insight. Good: "When upgrading Rails from 7.2 to 8.0, the asset pipeline silently stopped compiling SCSS." Good: "While profiling a slow API endpoint, I found that N+1 queries were hidden behind a cached association." Avoid: multi-sentence personal stories ("I was debugging for hours and finally my colleague suggested...").
 - **One insight per entry**: Each TIL teaches exactly ONE thing. If there are multiple insights, create separate entries.
 - **Concrete examples**: Include code snippets, commands, or specific data whenever relevant. Avoid vague descriptions.
-- **Title**: 5-15 words. Descriptive, same language as content. No "TIL:" prefix.
+- **Title**: 3-15 words. Descriptive, same language as content. No "TIL:" prefix.
+- **Preferred structure** (flexible, not mandatory):
+  1. 1-2 sentence context or problem statement
+  2. Core insight or explanation
+  3. Code example, command, or concrete demonstration
+  4. (Optional) Caveats, edge cases, or reference links
 - **Content**: Use the most efficient format for the knowledge — tables for comparisons, code blocks for examples, lists for enumerations, math (`$inline$` / `$$display$$`) for formulas with fractions/subscripts/superscripts/greek letters, Mermaid diagrams (` ```mermaid `) for flows/states/sequences that text cannot clearly express. Simple expressions like `O(n)` stay as inline code; use math only when notation complexity warrants it. Only use prose when explaining causation or context. Never pad content; if one sentence suffices, don't write a paragraph.
-- **Tags**: 1-3 lowercase tags from the technical domain (`go`, `rails`, `postgresql`, `css`, `linux`). No generic tags like `programming` or `til`.
+- **Content length**: Most entries are 10-100 lines. Shorter is fine when the insight is simple. Longer is fine for multi-example walkthroughs — let topic complexity dictate length.
+- **Tags**: 1-3 lowercase tags. Use specific technology/tool names, not categories. No generic tags like `programming`, `til`, `webdev`, or `backend`. Examples: `[go, concurrency]`, `[postgresql, indexing]`, `[css, flexbox]`, `[docker, networking]`. For non-tech TILs: `[cooking, fermentation]`, `[astronomy, optics]`.
 - **Lang**: Detect from content. Chinese -> `zh-CN`, Traditional Chinese -> `zh-TW`, English -> `en`, Japanese -> `ja`, Korean -> `ko`.
 - **Category**: Do not auto-infer `category_name` -- only include it if the user explicitly specifies a category/topic.
 - **Summary**: 1-2 sentences, plain text (no markdown). Max 500 chars and must be shorter than the content body. Same language as content. Self-contained: the reader should understand the core takeaway from the summary alone. Be specific about what the reader will learn, not meta ("this article discusses..."). No first person, no meta-descriptions. Omit if the content is already very short (under ~200 chars) -- the excerpt fallback is sufficient.
