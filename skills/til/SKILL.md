@@ -3,7 +3,7 @@ name: til
 description: Capture and manage TIL (Today I Learned) entries on OpenTIL. Use /til to capture insights, or /til list|publish|edit|search|delete|status|sync|tags|categories|batch|auth to manage entries -- all without leaving the CLI.
 homepage: https://opentil.ai
 license: MIT
-metadata: {"author":"opentil","version":"1.11.0","primaryEnv":"OPENTIL_TOKEN","openclaw":{"emoji":"💡","requires":{"env":["OPENTIL_TOKEN"]}}}
+metadata: {"author":"opentil","version":"1.12.0","primaryEnv":"OPENTIL_TOKEN","openclaw":{"emoji":"💡","requires":{"env":["OPENTIL_TOKEN"]}}}
 ---
 
 # til
@@ -165,7 +165,7 @@ Every `/til` invocation follows this flow:
    - **401 response** -> save locally -> inline re-authentication (see Error Handling):
      - Token from `~/.til/credentials` (active profile) or no prior token: prompt to reconnect via device flow → on success, update the active profile's token and auto-retry the original operation
      - Token from `$OPENTIL_TOKEN` env var: cannot auto-fix — guide user to update/unset the variable
-3. **Show identity** -- when ≥2 profiles are configured, include `Account: @nickname (profile_name)` in result messages so the user always knows which account was used
+3. **Show identity** -- when ≥2 profiles are configured, include `Account: @nickname (profile_name)` in ALL result messages, confirmations, and list headers so the user always knows which account is being used. See Multi-Account Display Rules in management.md for full specification.
 4. **Never lose content** -- the entry is always persisted somewhere
 5. **On API failure** -> save locally as draft (fallback unchanged)
 
@@ -486,11 +486,35 @@ Draft saved to OpenTIL
 Found 3 local drafts from before. Sync them to OpenTIL?
 ```
 
+**Multi-profile variant** (≥2 profiles):
+
+```
+Draft saved to OpenTIL
+
+  Account: @hong (personal)
+  Title:   Go interfaces are satisfied implicitly
+  Tags:    go, interfaces
+  Review:  https://opentil.ai/@hong/go-interfaces-are-satisfied-implicitly
+
+Found 3 local drafts from before. Sync them to OpenTIL?
+```
+
 On confirmation, POST each draft to the API. Delete the local file after each successful sync. Keep files that fail. Show summary:
 
 ```
 Synced 3 local drafts to OpenTIL
 
+  + Go defer runs in LIFO order
+  + PostgreSQL JSONB indexes support GIN operators
+  + CSS :has() selector enables parent selection
+```
+
+**Multi-profile variant** (≥2 profiles):
+
+```
+Synced 3 local drafts to OpenTIL
+
+  Account: @hong (personal)
   + Go defer runs in LIFO order
   + PostgreSQL JSONB indexes support GIN operators
   + CSS :has() selector enables parent selection

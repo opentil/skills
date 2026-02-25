@@ -71,6 +71,12 @@ If no files exist, skip sync entirely.
 Found 3 local drafts from before. Sync them to OpenTIL?
 ```
 
+**Multi-profile variant** (≥2 profiles):
+
+```
+Found 3 local drafts from before. Sync to @hong (personal)?
+```
+
 Wait for user confirmation. If the user declines, do not ask again this session.
 
 ### Step 3: Sync Each Draft
@@ -100,6 +106,16 @@ For each `.md` file in `~/.til/drafts/`:
 ```
 Synced 3 local drafts to OpenTIL
 
+  + Go defer runs in LIFO order
+  + PostgreSQL JSONB indexes support GIN operators
+  + CSS :has() selector enables parent selection
+```
+
+**Multi-profile variant** (≥2 profiles):
+```
+Synced 3 local drafts to OpenTIL
+
+  Account: @hong (personal)
   + Go defer runs in LIFO order
   + PostgreSQL JSONB indexes support GIN operators
   + CSS :has() selector enables parent selection

@@ -101,6 +101,12 @@ Append the suggestion at the end of your normal response. Never interrupt the wo
    Tags: [tag1, tag2] · Capture? (yes/no)
 ```
 
+**Multi-profile variant** (≥2 profiles):
+```
+💡 TIL: [concise title of the insight]
+   @hong (personal) · Tags: [tag1, tag2] · Capture? (yes/no)
+```
+
 **Example** (debugging root cause):
 ```
 ...so the memory leak was caused by the goroutine holding a reference to the entire request body.

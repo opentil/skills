@@ -53,6 +53,35 @@ Permission denied — your token needs the <scope> scope.
 Regenerate at: https://opentil.ai/dashboard/settings/tokens
 ```
 
+When ≥2 profiles, include the profile identity:
+
+```
+Permission denied — token for @hong (personal) needs the <scope> scope.
+
+Regenerate at: https://opentil.ai/dashboard/settings/tokens
+```
+
+## Multi-Account Display Rules
+
+When ≥2 profiles are configured in `~/.til/credentials`, add `Account: @nickname (profile_name)` to output. This helps the user know which account is being used.
+
+**Applies to**: list/search headers, confirmations, results, error messages.
+
+**Does NOT apply to**: `status` (has its own Profile line), `auth` family (identity is implicit), empty states.
+
+**Single-profile users see no Account line** — keep the output clean.
+
+**Pattern** — insert `Account:` as the first detail line in output blocks:
+
+```
+<result heading>
+
+  Account: @hong (personal)
+  <other detail lines>
+```
+
+All subcommand examples below include multi-profile variants where applicable.
+
 ## ID Format and Resolution
 
 ### Display Format
@@ -113,6 +142,21 @@ Your drafts (3):
   Page 1 of 1 · 3 entries
 ```
 
+**Multi-profile variant** (≥2 profiles):
+
+```
+Your drafts (3):
+
+  Account: @hong (personal)
+
+  ID            Status    Title
+  ...a1b2c3d4   Draft     Go interfaces are satisfied implicitly
+  ...e5f6g7h8   Draft     Ruby supports pattern matching
+  ...i9j0k1l2   Draft     CSS :has() enables parent selection
+
+  Page 1 of 1 · 3 entries
+```
+
 **Empty state**:
 
 ```
@@ -144,6 +188,18 @@ Publish this entry?
 Confirm? (y/n)
 ```
 
+**Multi-profile variant** (≥2 profiles):
+
+```
+Publish this entry?
+
+  Account: @hong (personal)
+  Title:   Go interfaces are satisfied implicitly
+  Tags:    go, interfaces
+
+Confirm? (y/n)
+```
+
 3. On confirmation → `POST /entries/:id/publish`
 4. Show result:
 
@@ -152,6 +208,16 @@ Published
 
   Title: Go interfaces are satisfied implicitly
   URL:   https://opentil.ai/@username/go-interfaces-are-satisfied-implicitly
+```
+
+**Multi-profile variant** (≥2 profiles):
+
+```
+Published
+
+  Account: @hong (personal)
+  Title:   Go interfaces are satisfied implicitly
+  URL:     https://opentil.ai/@hong/go-interfaces-are-satisfied-implicitly
 ```
 
 **Already published**: Informational, not an error.
@@ -175,6 +241,15 @@ Unpublish this entry? It will become a draft.
   Title: Go interfaces are satisfied implicitly
 ```
 
+**Multi-profile variant** (≥2 profiles):
+
+```
+Unpublish this entry? It will become a draft.
+
+  Account: @hong (personal)
+  Title:   Go interfaces are satisfied implicitly
+```
+
 3. On confirmation → `POST /entries/:id/unpublish`
 4. Show result:
 
@@ -182,6 +257,15 @@ Unpublish this entry? It will become a draft.
 Unpublished — entry is now a draft.
 
   Title: Go interfaces are satisfied implicitly
+```
+
+**Multi-profile variant** (≥2 profiles):
+
+```
+Unpublished — entry is now a draft.
+
+  Account: @hong (personal)
+  Title:   Go interfaces are satisfied implicitly
 ```
 
 **Already a draft**: Informational, not an error.
@@ -214,6 +298,19 @@ Proposed changes to "Go interfaces are satisfied implicitly":
 Apply changes?
 ```
 
+**Multi-profile variant** (≥2 profiles):
+
+```
+Proposed changes to "Go interfaces are satisfied implicitly":
+
+  Account: @hong (personal)
+
+  Title: Go interfaces are satisfied implicitly (unchanged)
+  ...
+
+Apply changes?
+```
+
 4. On confirmation → `PATCH /entries/:id` with only the changed fields
 5. Show result:
 
@@ -224,6 +321,16 @@ Updated
   URL:   https://opentil.ai/@username/go-interfaces-are-satisfied-implicitly
 ```
 
+**Multi-profile variant** (≥2 profiles):
+
+```
+Updated
+
+  Account: @hong (personal)
+  Title:   Go interfaces are satisfied implicitly
+  URL:     https://opentil.ai/@hong/go-interfaces-are-satisfied-implicitly
+```
+
 ### `/til search <keyword>`
 
 **API call**: `GET /entries?q=<keyword>&per_page=10`
@@ -232,6 +339,20 @@ Updated
 
 ```
 Search results for "go" (2):
+
+  ID            Status      Title
+  ...a1b2c3d4   Published   Go interfaces are satisfied implicitly
+  ...i9j0k1l2   Draft       Go concurrency with goroutines
+
+  2 entries found
+```
+
+**Multi-profile variant** (≥2 profiles):
+
+```
+Search results for "go" (2):
+
+  Account: @hong (personal)
 
   ID            Status      Title
   ...a1b2c3d4   Published   Go interfaces are satisfied implicitly
@@ -261,6 +382,18 @@ Delete this entry? This cannot be undone.
 Type "delete" to confirm:
 ```
 
+**Multi-profile variant** (≥2 profiles):
+
+```
+Delete this entry? This cannot be undone.
+
+  Account: @hong (personal)
+  Title:   Go interfaces are satisfied implicitly
+  Status:  Draft
+
+Type "delete" to confirm:
+```
+
 3. On confirmation → `DELETE /entries/:id`
 4. Show result:
 
@@ -268,6 +401,15 @@ Type "delete" to confirm:
 Deleted.
 
   Title: Go interfaces are satisfied implicitly
+```
+
+**Multi-profile variant** (≥2 profiles):
+
+```
+Deleted.
+
+  Account: @hong (personal)
+  Title:   Go interfaces are satisfied implicitly
 ```
 
 ### `/til status`
@@ -367,7 +509,8 @@ Connect an OpenTIL account via Device Flow (browser-based authorization). **Work
    - Resolve token (env var → active profile in `~/.til/credentials`)
    - If `~/.til/credentials` exists in old plain-text format, migrate to YAML `default` profile first
    - If token found, `GET /site` to verify:
-     - Valid: `"Already connected as @{username}. Re-authorize? (y/n)"`
+     - Valid: `"Connected as @{username}. Authorize? Same account refreshes token, different account adds it. (y/n)"`
+       (When ≥2 profiles, include profile name: `"Connected as @{username} ({profile_name})."`)
        - `y` → continue to new authorization
        - `n` → end
      - Invalid (401) → continue to new authorization
@@ -404,22 +547,35 @@ Waiting for authorization...
    - Create `~/.til/` directory if it doesn't exist
    - `GET /site` with the new token to fetch `username` (nickname)
    - Determine profile name: use the API-returned `username` as the default profile name
-     - If a profile with the same name already exists and its token differs, append a numeric suffix (`hong-2`, `hong-3`, etc.)
-     - If re-authorizing the current active profile (same nickname), update the existing profile's token in-place
+     - Search ALL profiles for a matching `nickname` (not just the active profile)
+     - Match found → update that profile's token in-place
+     - No nickname match but profile name collision → append numeric suffix (`hong-2`, etc.)
+     - No match at all → create new profile
    - Write `~/.til/credentials` in YAML format (`chmod 600`):
      - Set `active` to the new profile name
      - Add/update the profile under `profiles` with `token`, `nickname`, `site_url`, `host`
-   - Display:
+   - Display depends on the outcome:
 
-```
-✓ Connected as @hong
-  Profile "hong" saved to ~/.til/credentials
-```
+     **Refreshed active profile token:**
 
-   - If other profiles already exist, and this is a new profile (not re-auth), ask whether to switch:
-     - `"Switch to @hong (hong)? (y/n)"` — default yes
-     - `y` or new profile → set as active
-     - `n` → keep current active profile
+     ```
+     ✓ Token refreshed for @hong
+     ```
+
+     **Refreshed non-active profile token:**
+
+     ```
+     ✓ Token refreshed for @hong-corp (work)
+     ```
+     + `Switch to @hong-corp? (y/n)`
+
+     **New account added:**
+
+     ```
+     ✓ Connected as @new-user
+       Profile "new-user" saved to ~/.til/credentials
+     ```
+     + `Switch to @new-user? (y/n)` (skip if this is the first profile — set active automatically)
 
    - Check `~/.til/drafts/` for local drafts
    - If drafts exist: `"Found N local drafts. Sync now? (y/n)"`
@@ -447,8 +603,9 @@ Unable to reach OpenTIL. Check your connection and try again.
 | User cancels in browser | Polling times out, show timeout message |
 | Token obtained + local drafts exist | Offer to sync |
 | Old plain-text credentials file | Migrate to YAML `default` profile before proceeding |
-| Re-auth same account | Update existing profile's token in-place |
-| Auth new account, profiles exist | Ask whether to switch to new profile |
+| Re-auth active account | Refresh token in-place, show "Token refreshed" |
+| Re-auth non-active account | Refresh token in-place, offer to switch |
+| Auth new account, profiles exist | Save new profile, offer to switch |
 
 ### `/til auth switch [name]`
 
@@ -533,16 +690,17 @@ Profiles:
 
 Remove a profile from `~/.til/credentials`. **Works without a token.**
 
-**Cannot remove active profile (when other profiles exist):**
+**Active profile + others exist:** Confirm with auto-switch info:
 
 ```
-Cannot remove "personal" — it is the active profile.
-Switch to another profile first: /til auth switch <name>
+Remove "personal" (@hong)? This is your active profile.
+Will switch to "work" (@hong-corp) after removal. (y/n)
 ```
 
-**Last remaining profile:** Can be removed even if active (special case — returns to "not connected" state).
+- `y` → remove profile + auto-switch to next profile in file order, write back `~/.til/credentials`
+- `n` → cancel
 
-**Confirmation:**
+**Non-active profile:**
 
 ```
 Remove profile "work" (@hong-corp)? (y/n)
@@ -550,6 +708,12 @@ Remove profile "work" (@hong-corp)? (y/n)
 
 - `y` → remove from `profiles` map, write back `~/.til/credentials`
 - `n` → cancel
+
+**Last remaining profile:** Can be removed (returns to "not connected" state).
+
+```
+Remove "personal" (@hong)? This is your only profile. (y/n)
+```
 
 When the last profile is removed, `~/.til/credentials` is cleared (empty `profiles` map, no `active` field).
 
@@ -599,6 +763,19 @@ Found 2 local drafts:
 Sync to OpenTIL? (y/n)
 ```
 
+**Multi-profile variant** (≥2 profiles):
+
+```
+Found 2 local drafts:
+
+  Account: @hong (personal)
+
+  1. go-interfaces.md
+  2. rails-solid-queue.md
+
+Sync to OpenTIL? (y/n)
+```
+
 4. On confirmation, for each file: parse frontmatter, POST to API (with correct attribution headers), delete local file on success
 5. Show results:
 
@@ -606,6 +783,16 @@ Sync to OpenTIL? (y/n)
 
 ```
 Synced 2 local drafts
+  ✓ go-interfaces.md
+  ✓ rails-solid-queue.md
+```
+
+**Multi-profile variant** (≥2 profiles):
+
+```
+Synced 2 local drafts
+
+  Account: @hong (personal)
   ✓ go-interfaces.md
   ✓ rails-solid-queue.md
 ```
@@ -640,6 +827,20 @@ Your tags (12):
   Showing top 20 · 12 total tags
 ```
 
+**Multi-profile variant** (≥2 profiles):
+
+```
+Your tags (12):
+
+  Account: @hong (personal)
+
+  Tag               Entries
+  go                      8
+  ...
+
+  Showing top 20 · 12 total tags
+```
+
 **Empty state:**
 ```
 No tags yet. Tags are created automatically when you publish entries.
@@ -660,6 +861,20 @@ Your categories (3):
   Backend              12   Server-side topics
   Frontend              8   Client-side development
   DevOps                5   Infrastructure and deployment
+
+  3 categories
+```
+
+**Multi-profile variant** (≥2 profiles):
+
+```
+Your categories (3):
+
+  Account: @hong (personal)
+
+  Name             Entries  Description
+  Backend              12   Server-side topics
+  ...
 
   3 categories
 ```
@@ -701,12 +916,37 @@ Generated 3 drafts:
 Which to send? (1/2/3/all/none)
 ```
 
+**Multi-profile variant** (≥2 profiles) — add Account above draft list:
+
+```
+Generated 3 drafts:
+
+  Account: @hong (personal)
+
+  1. Go channels block when buffer is full
+     Tags: go, concurrency
+  ...
+
+Which to send? (1/2/3/all/none)
+```
+
 4. On confirmation, POST each selected entry sequentially
 5. Show summary:
 
 ```
 Captured 3 TILs
 
+  ✓ Go channels block when buffer is full
+  ✓ CSS grid fr unit distributes remaining space
+  ✓ PostgreSQL EXPLAIN ANALYZE shows actual vs estimated rows
+```
+
+**Multi-profile variant** (≥2 profiles):
+
+```
+Captured 3 TILs
+
+  Account: @hong (personal)
   ✓ Go channels block when buffer is full
   ✓ CSS grid fr unit distributes remaining space
   ✓ PostgreSQL EXPLAIN ANALYZE shows actual vs estimated rows
@@ -764,6 +1004,14 @@ Create a new token: https://opentil.ai/dashboard/settings/tokens
 
 ```
 Permission denied — your token needs the <scope> scope.
+
+Regenerate at: https://opentil.ai/dashboard/settings/tokens
+```
+
+When ≥2 profiles, mention which profile's token lacks scope:
+
+```
+Permission denied — token for @hong (personal) needs the <scope> scope.
 
 Regenerate at: https://opentil.ai/dashboard/settings/tokens
 ```
