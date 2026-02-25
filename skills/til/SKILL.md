@@ -174,7 +174,7 @@ Every `/til` invocation follows this flow:
 The user's input is **raw material** -- a seed, not the final entry. Generate a complete TIL from it:
 
 - Short but unclear (a few words, ambiguous without context) -> expand into a full entry with context and examples
-- Short but complete (a clear, self-contained statement) -> preserve as-is; add a code example only if it strengthens the entry
+- Short but complete (a clear, self-contained statement) -> preserve the substance as-is; still generate title, tags, summary, and lang as normal. Add a code example only if it strengthens the entry
 - Long input (a paragraph or more) -> refine and structure, but preserve the user's intent
 
 **Steps:**
@@ -405,7 +405,7 @@ X-OpenTIL-Model: <human-readable model name>
 ### Layer 2: Tag Convention
 
 - Auto-detected TILs: automatically add `agent-assisted` to the tag list
-- `/til <content>` and `/til`: do **not** add the tag (unless the Agent substantially rewrote the content)
+- `/til <content>` and `/til`: do **not** add the tag (unless the agent generated >80% of the final content from a minimal seed — e.g. user gave a few words and agent produced a full entry)
 
 ### Layer 3: Attribution Rendering (Backend)
 
@@ -438,21 +438,26 @@ Every TIL entry must follow these rules:
 - **Self-contained**: The reader must understand the entry without any conversation context. Never write "as we discussed", "the above error", "this project's config", etc.
 - **Desensitized**: Remove project names, company details, colleague names, internal URLs, and proprietary business logic. Generalize specifics: "our User model" -> "a model", "the production server" -> "a production environment", "the Acme payment service" -> "a payment gateway".
 - **Universally valuable**: Write to StackOverflow-answer standards. A stranger searching for this topic should find the entry immediately useful. Content only useful to the author belongs in private notes, not TIL.
-- **Factual tone**: State facts, show examples, explain why. Avoid extended first-person narrative, but a brief contextual setup is encouraged to ground the insight. Good: "When upgrading Rails from 7.2 to 8.0, the asset pipeline silently stopped compiling SCSS." Good: "While profiling a slow API endpoint, I found that N+1 queries were hidden behind a cached association." Avoid: multi-sentence personal stories ("I was debugging for hours and finally my colleague suggested...").
+- **Factual tone**: State facts, show examples, explain why. Second-person instructional voice ("You can...", "If you want to...") is natural and preferred for TIL entries. Brief first-person context is fine to ground the insight. Good: "You can use `git diff --word-diff=color` to see inline character-level changes." Good: "When upgrading Rails from 7.2 to 8.0, the asset pipeline silently stopped compiling SCSS." Avoid: multi-sentence personal stories ("I was debugging for hours and finally my colleague suggested...").
 - **One insight per entry**: Each TIL teaches exactly ONE thing. If there are multiple insights, create separate entries.
-- **Concrete examples**: Include code snippets, commands, or specific data whenever relevant. Avoid vague descriptions.
+- **Concrete examples**: Include code snippets, commands, or specific data whenever relevant. Avoid vague descriptions. Show expected output inline using comment syntax (`# => true`, `//=> [1, 2, 3]`) to make examples self-verifying and scannable.
 - **Title**: 3-15 words. Descriptive, same language as content. No "TIL:" prefix.
 - **Preferred structure** (flexible, not mandatory):
   1. 1-2 sentence context or problem statement
   2. Core insight or explanation
-  3. Code example, command, or concrete demonstration
+  3. Code example, command, or concrete demonstration — for multi-faceted topics, use 2-3 code blocks that build progressively (basic usage → advanced usage → full example or edge case)
   4. (Optional) Caveats, edge cases, or reference links
-- **Content**: Use the most efficient format for the knowledge — tables for comparisons, code blocks for examples, lists for enumerations, math (`$inline$` / `$$display$$`) for formulas with fractions/subscripts/superscripts/greek letters, Mermaid diagrams (` ```mermaid `) for flows/states/sequences that text cannot clearly express. Simple expressions like `O(n)` stay as inline code; use math only when notation complexity warrants it. Only use prose when explaining causation or context. Never pad content; if one sentence suffices, don't write a paragraph.
+  - *Variant — "Expected vs. Actual"*: Show the expected behavior first, then reveal the surprising actual result. Effective for gotcha/pitfall TILs where the "aha" is in the contrast.
+- **Content**: Use the most efficient format for the knowledge — tables for comparisons, code blocks for examples, lists for enumerations, math (`$inline$` / `$$display$$`) for formulas with fractions/subscripts/superscripts/greek letters, Mermaid diagrams (` ```mermaid `) for flows/states/sequences that text cannot clearly express, images/screenshots for visual bugs or UI behavior. Simple expressions like `O(n)` stay as inline code; use math only when notation complexity warrants it. Only use prose when explaining causation or context. Never pad content; if one sentence suffices, don't write a paragraph.
 - **Content length**: Most entries are 10-100 lines. Shorter is fine when the insight is simple. Longer is fine for multi-example walkthroughs — let topic complexity dictate length.
-- **Tags**: 1-3 lowercase tags. Use specific technology/tool names, not categories. No generic tags like `programming`, `til`, `webdev`, or `backend`. Examples: `[go, concurrency]`, `[postgresql, indexing]`, `[css, flexbox]`, `[docker, networking]`. For non-tech TILs: `[cooking, fermentation]`, `[astronomy, optics]`.
+- **Tags**: 1-3 lowercase tags (if the topic warrants more, pick the 3 most specific). Use concrete technology/tool names, not meta-categories. Generic tags like `programming`, `til`, `webdev`, or `backend` describe *what TIL is* rather than *what the insight is about* — avoid them. Domain-specific tags like `cooking` or `astronomy` are fine because they name the subject area. Examples: `[go, concurrency]`, `[postgresql, indexing]`, `[css, flexbox]`, `[docker, networking]`, `[cooking, fermentation]`, `[astronomy, optics]`.
 - **Lang**: Detect from content. Chinese -> `zh-CN`, Traditional Chinese -> `zh-TW`, English -> `en`, Japanese -> `ja`, Korean -> `ko`.
 - **Category**: Do not auto-infer `category_name` -- only include it if the user explicitly specifies a category/topic.
 - **Summary**: 1-2 sentences, plain text (no markdown). Max 500 chars and must be shorter than the content body. Same language as content. Self-contained: the reader should understand the core takeaway from the summary alone. Be specific about what the reader will learn, not meta ("this article discusses..."). No first person, no meta-descriptions. Omit if the content is already very short (under ~200 chars) -- the excerpt fallback is sufficient.
+- **Anti-patterns** (avoid these):
+  - *Command-only*: A single command or snippet with no explanation of when/why to use it. At minimum, explain the context or problem it solves.
+  - *Title = body*: If the title fully conveys the insight and the body just restates it, either expand with a concrete example or accept that the insight may be too thin for a standalone entry.
+  - *"X exists" without "so what"*: Simply noting a feature or tool exists is not a TIL. Explain why it matters, when you'd reach for it, or what problem it solves.
 
 ## Result Messages
 
