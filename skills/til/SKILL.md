@@ -3,7 +3,7 @@ name: til
 description: Capture and manage TIL (Today I Learned) entries on OpenTIL. Use /til to capture insights, or /til list|publish|edit|search|delete|status|sync|tags|categories|batch|auth to manage entries -- all without leaving the CLI.
 homepage: https://opentil.ai
 license: MIT
-metadata: {"author":"opentil","version":"1.23.0","primaryEnv":"OPENTIL_TOKEN","openclaw":{"emoji":"💡","requires":{"env":["OPENTIL_TOKEN"]}}}
+metadata: {"author":"opentil","version":"1.24.0","primaryEnv":"OPENTIL_TOKEN","openclaw":{"emoji":"💡","requires":{"env":["OPENTIL_TOKEN"]}}}
 ---
 
 # til
