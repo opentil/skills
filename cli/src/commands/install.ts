@@ -20,7 +20,7 @@ const EXTRA_LABELS: Record<ExtraType, string> = {
 
 // ─── Fast path detection ────────────────────────────────────────────
 
-function shouldUseFastPath(
+export function shouldUseFastPath(
   manifest: Manifest | null,
   installedAgents: DetectedAgent[],
 ): boolean {
@@ -198,17 +198,21 @@ export async function install(): Promise<void> {
     s.stop(`${config.displayName}: skill${extrasLabel}`);
   }
 
-  // MCP Server installation
-  const mcpToken = authResult.token;
+  // MCP Server installation — only offer when authenticated (token available)
   const mcpCapableAgents = selectedAgentIds.filter((id) => agents[id].mcpConfigPath);
 
-  if (mcpCapableAgents.length > 0) {
+  if (mcpCapableAgents.length > 0 && authResult.authenticated) {
+    const mcpToken = authResult.token;
     const existingMcpAgents = existingManifest
       ? mcpCapableAgents.filter((id) => existingManifest.agents[id]?.mcp)
       : [];
 
+    const mcpMessage = authResult.username
+      ? `Enable MCP Server for @${authResult.username}? (lets agents search your TIL knowledge base)`
+      : 'Enable MCP Server? (lets agents search your TIL knowledge base)';
+
     const mcpSelection = await p.multiselect({
-      message: 'Enable MCP Server? (lets agents search your TIL knowledge base)',
+      message: mcpMessage,
       options: mcpCapableAgents.map((id) => ({
         value: id,
         label: agents[id].displayName,
@@ -363,6 +367,10 @@ function showSummary(
     );
   } else {
     const authHint = buildAuthHint(selectedAgentIds);
+    const hasMcpCapable = selectedAgentIds.some((id) => agents[id].mcpConfigPath);
+    const mcpGuide = hasMcpCapable
+      ? `  3. Re-run installer to enable MCP (knowledge base search)`
+      : '';
     p.note(
       [
         `Skill installed for: ${selectedAgentIds.map((id) => agents[id].displayName).join(', ')}`,
@@ -371,6 +379,7 @@ function showSummary(
         'Next steps:',
         `  1. ${authHint}`,
         `  2. ${prefixHint}`,
+        mcpGuide,
         mcpToolsLine,
         '',
         `Re-run ${pc.cyan('npx @opentil/cli')} to modify your setup.`,
