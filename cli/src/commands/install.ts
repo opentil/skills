@@ -182,7 +182,7 @@ export async function install(): Promise<void> {
 
     // Copy SKILL.md + references
     const skillDir = join(config.globalSkillDir, 'til');
-    installSkillFiles(skillDir);
+    installSkillFiles(skillDir, { commandPrefix: config.commandPrefix });
 
     // Install extras
     installAgentExtras(agentId, config, extras);
@@ -263,7 +263,7 @@ async function fastPathInstall(
     const config = agents[agentId];
     if (!config) continue;
     const skillDir = join(config.globalSkillDir, 'til');
-    installSkillFiles(skillDir);
+    installSkillFiles(skillDir, { commandPrefix: config.commandPrefix });
 
     // Reinstall extras
     const extras = existingManifest.agents[agentId]?.extras ?? [];
@@ -300,6 +300,39 @@ async function fastPathInstall(
 
 // ─── Summary ────────────────────────────────────────────────────────
 
+function getPrefixGroups(selectedAgentIds: string[]): Map<string, string[]> {
+  const groups = new Map<string, string[]>();
+  for (const id of selectedAgentIds) {
+    const prefix = agents[id].commandPrefix ?? '/til';
+    const list = groups.get(prefix) ?? [];
+    list.push(agents[id].displayName);
+    groups.set(prefix, list);
+  }
+  return groups;
+}
+
+function buildPrefixHint(selectedAgentIds: string[]): string {
+  const prefixGroups = getPrefixGroups(selectedAgentIds);
+  if (prefixGroups.size === 1) {
+    const prefix = prefixGroups.keys().next().value!;
+    return `Use ${prefix} in your agent to capture insights!`;
+  }
+  return Array.from(prefixGroups.entries())
+    .map(([prefix, names]) => `Use ${prefix} in ${names.join(', ')}`)
+    .join('; ') + ' to capture insights!';
+}
+
+function buildAuthHint(selectedAgentIds: string[]): string {
+  const prefixGroups = getPrefixGroups(selectedAgentIds);
+  if (prefixGroups.size === 1) {
+    const prefix = prefixGroups.keys().next().value!;
+    return `Run ${prefix} auth in your agent to connect your account`;
+  }
+  return Array.from(prefixGroups.entries())
+    .map(([prefix, names]) => `Run ${prefix} auth in ${names.join(', ')}`)
+    .join(', or ') + ' to connect your account';
+}
+
 function showSummary(
   selectedAgentIds: string[],
   manifest: Manifest,
@@ -312,6 +345,7 @@ function showSummary(
   const mcpToolsLine = mcpAgents.length > 0
     ? '  MCP tools are ready — agents can search your TIL knowledge base'
     : '';
+  const prefixHint = buildPrefixHint(selectedAgentIds);
 
   if (authResult.authenticated) {
     p.note(
@@ -320,7 +354,7 @@ function showSummary(
         mcpLine,
         `  Account: @${authResult.username}`,
         '',
-        'Use /til in your agent to capture insights!',
+        prefixHint,
         mcpToolsLine,
         '',
         `Re-run ${pc.cyan('npx @opentil/cli')} to modify your setup.`,
@@ -328,14 +362,15 @@ function showSummary(
       'Setup complete',
     );
   } else {
+    const authHint = buildAuthHint(selectedAgentIds);
     p.note(
       [
         `Skill installed for: ${selectedAgentIds.map((id) => agents[id].displayName).join(', ')}`,
         mcpLine,
         '',
         'Next steps:',
-        '  1. Run /til auth in your agent to connect your account',
-        '  2. Use /til in your agent to capture insights!',
+        `  1. ${authHint}`,
+        `  2. ${prefixHint}`,
         mcpToolsLine,
         '',
         `Re-run ${pc.cyan('npx @opentil/cli')} to modify your setup.`,
@@ -369,7 +404,7 @@ function removeAgentSkill(agentId: string, globalSkillDir: string): void {
 
 function installAgentExtras(agentId: string, config: typeof agents[string], extras: ExtraType[]): void {
   if (extras.includes('agent-md') && config.agentMdPath) {
-    installAgentMdSection(config.agentMdPath);
+    installAgentMdSection(config.agentMdPath, config.commandPrefix);
   }
   if (agentId === 'claude-code' && extras.includes('hooks')) {
     installClaudeCodeHooks();

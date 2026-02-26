@@ -18,13 +18,25 @@ function resolveSkillDir(): string {
   throw new Error('Could not find skill content. Please report this issue.');
 }
 
-export function installSkillFiles(targetDir: string): void {
+const DEFAULT_PREFIX = '/til';
+
+function replaceCommandPrefix(content: string, prefix: string): string {
+  // Replace /til when followed by a non-alphanumeric/underscore char or end of string.
+  // This avoids replacing path segments like ~/.til/ (which is .til, not /til).
+  return content.replace(/\/til(?=[^a-zA-Z0-9_]|$)/g, prefix);
+}
+
+export function installSkillFiles(targetDir: string, options?: { commandPrefix?: string }): void {
   const skillDir = resolveSkillDir();
+  const prefix = options?.commandPrefix;
+  const shouldReplace = prefix != null && prefix !== DEFAULT_PREFIX;
+
+  const transform = (text: string) => shouldReplace ? replaceCommandPrefix(text, prefix) : text;
 
   // Copy SKILL.md
   const skillMd = readFileSync(join(skillDir, 'SKILL.md'), 'utf-8');
   ensureDir(targetDir);
-  writeTextFile(join(targetDir, 'SKILL.md'), skillMd);
+  writeTextFile(join(targetDir, 'SKILL.md'), transform(skillMd));
 
   // Copy references/
   const refsDir = join(skillDir, 'references');
@@ -33,7 +45,7 @@ export function installSkillFiles(targetDir: string): void {
     ensureDir(targetRefsDir);
     for (const file of readdirSync(refsDir)) {
       const content = readFileSync(join(refsDir, file), 'utf-8');
-      writeTextFile(join(targetRefsDir, file), content);
+      writeTextFile(join(targetRefsDir, file), transform(content));
     }
   }
 }

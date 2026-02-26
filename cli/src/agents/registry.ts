@@ -13,6 +13,7 @@ export interface AgentConfig {
   extras: ExtraType[];
   agentMdPath?: string;
   mcpConfigPath?: string;
+  commandPrefix?: string;
 }
 
 const codexHome = process.env.CODEX_HOME?.trim() || join(home, '.codex');
@@ -98,6 +99,7 @@ export const agents: Record<string, AgentConfig> = {
     globalSkillDir: join(codexHome, 'skills'),
     extras: ['agent-md'],
     agentMdPath: join(codexHome, 'AGENTS.md'),
+    commandPrefix: '$til',
   },
   'command-code': {
     name: 'command-code',

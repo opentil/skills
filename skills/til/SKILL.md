@@ -615,11 +615,45 @@ Create a new token: https://opentil.ai/dashboard/settings/tokens
 
 **Network failure or 5xx:**
 
+If the error is a DNS/connection failure (e.g. `Could not resolve host`, `ECONNREFUSED`, `ETIMEDOUT` before receiving any HTTP response):
+→ Follow "Sandboxed Environments" flow below (save locally + guide + retry)
+
+If the error is an HTTP 5xx response:
+
 ```
 TIL captured (saved locally -- API unavailable)
 
   File: ~/.til/drafts/20260210-143022-go-interfaces.md
 ```
+
+### Sandboxed Environments
+
+Many agents run in sandboxed environments where network access is restricted by default. If an API call fails with a DNS or connection error (not an HTTP status code), you are likely in a sandbox — this is a network restriction, not an API outage.
+
+**Known sandbox configurations**:
+
+| Agent | How to enable network | Reference |
+|-------|----------------------|-----------|
+| Codex | `~/.codex/config.toml` → `[sandbox_workspace_write]` `network_access = true` | [Config Reference](https://developers.openai.com/codex/config-reference/) |
+| Claude Code | `/sandbox` command → add `opentil.ai` to allowed domains | [Sandboxing docs](https://code.claude.com/docs/en/sandboxing) |
+| Cursor | `sandbox.json` → add `opentil.ai` to domain allowlist | [Sandbox controls](https://cursor.com/blog/agent-sandboxing) |
+| Other agents | Check your agent's sandbox/network configuration | — |
+
+**Flow with retry**:
+1. Save content locally first (never lose content)
+2. Inform the user:
+   ```
+   Network request failed — this appears to be a sandbox network restriction, not an API outage.
+   Enable network access for opentil.ai in your agent's sandbox settings, then I can retry.
+   ```
+   Include the agent-specific configuration hint from the table above if you know which agent you are.
+3. Ask: "Retry? (y/n)"
+4. On `y` → retry the API call once
+   - Success → delete the local draft, show published URL
+   - Fail again → keep local draft, show short network-error message (do not ask again)
+5. On `n` → keep local draft, move on
+
+**Retry limit**: At most 1 retry per API call. Do not loop.
 
 > Full error codes, 422 auto-fix logic, and rate limit details: see references/api.md
 

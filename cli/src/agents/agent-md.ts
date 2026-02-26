@@ -19,8 +19,17 @@ function resolveTemplate(name: string): string {
 const OPENTIL_START = '<!-- opentil:start -->';
 const OPENTIL_END = '<!-- opentil:end -->';
 
-export function installAgentMdSection(agentMdPath: string): void {
-  const section = resolveTemplate('agent-md-section.md');
+const DEFAULT_PREFIX = '/til';
+
+function replaceCommandPrefix(content: string, prefix: string): string {
+  return content.replace(/\/til(?=[^a-zA-Z0-9_]|$)/g, prefix);
+}
+
+export function installAgentMdSection(agentMdPath: string, commandPrefix?: string): void {
+  let section = resolveTemplate('agent-md-section.md');
+  if (commandPrefix != null && commandPrefix !== DEFAULT_PREFIX) {
+    section = replaceCommandPrefix(section, commandPrefix);
+  }
 
   let content = readTextFile(agentMdPath);
   if (content === null) {
