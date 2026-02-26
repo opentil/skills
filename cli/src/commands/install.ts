@@ -4,7 +4,8 @@ import { existsSync } from 'node:fs';
 import { detectAgents, cleanupInstallerDirs, type DetectedAgent } from '../agents/detect.js';
 import { agents, type ExtraType } from '../agents/registry.js';
 import { installSkillFiles } from '../skill-content.js';
-import { installClaudeCodeExtras, uninstallClaudeCodeExtras } from '../agents/claude-code.js';
+import { installAgentMdSection, uninstallAgentMdSection } from '../agents/agent-md.js';
+import { installClaudeCodeHooks, uninstallClaudeCodeHooks } from '../agents/claude-code.js';
 import { installMcpConfig, uninstallMcpConfig } from '../mcp.js';
 import { removeDir } from '../utils.js';
 import { readManifest, writeManifest, createManifest, updateManifest, type Manifest } from '../manifest.js';
@@ -14,7 +15,7 @@ import { runAuthPhase } from '../auth.js';
 
 const EXTRA_LABELS: Record<ExtraType, string> = {
   hooks: 'Hooks (auto-detection reminders)',
-  'claude-md': 'CLAUDE.md (TIL auto-detection section)',
+  'agent-md': 'Instructions file (TIL auto-detection section)',
 };
 
 // ─── Fast path detection ────────────────────────────────────────────
@@ -183,9 +184,7 @@ export async function install(): Promise<void> {
     installSkillFiles(skillDir);
 
     // Install extras
-    if (agentId === 'claude-code') {
-      installClaudeCodeExtras(extras);
-    }
+    installAgentExtras(agentId, config, extras);
 
     manifest.agents[agentId] = {
       skill: true,
@@ -266,10 +265,8 @@ async function fastPathInstall(
     installSkillFiles(skillDir);
 
     // Reinstall extras
-    if (agentId === 'claude-code') {
-      const extras = existingManifest.agents[agentId]?.extras ?? [];
-      installClaudeCodeExtras(extras);
-    }
+    const extras = existingManifest.agents[agentId]?.extras ?? [];
+    installAgentExtras(agentId, config, extras);
   }
   s.stop(`Updated ${selectedAgentIds.length} agent${selectedAgentIds.length === 1 ? '' : 's'}`);
 
@@ -355,13 +352,34 @@ function removeAgentSkill(agentId: string, globalSkillDir: string): void {
   const skillDir = join(globalSkillDir, 'til');
   removeDir(skillDir);
 
-  if (agentId === 'claude-code') {
-    uninstallClaudeCodeExtras();
+  const config = agents[agentId];
+
+  if (config) {
+    uninstallAgentExtras(agentId, config);
   }
 
   // Remove MCP config if present
-  const config = agents[agentId];
   if (config?.mcpConfigPath) {
     uninstallMcpConfig(config.mcpConfigPath);
+  }
+}
+
+// ─── Extras dispatch ─────────────────────────────────────────────────
+
+function installAgentExtras(agentId: string, config: typeof agents[string], extras: ExtraType[]): void {
+  if (extras.includes('agent-md') && config.agentMdPath) {
+    installAgentMdSection(config.agentMdPath);
+  }
+  if (agentId === 'claude-code' && extras.includes('hooks')) {
+    installClaudeCodeHooks();
+  }
+}
+
+function uninstallAgentExtras(agentId: string, config: typeof agents[string]): void {
+  if (config.agentMdPath) {
+    uninstallAgentMdSection(config.agentMdPath);
+  }
+  if (agentId === 'claude-code') {
+    uninstallClaudeCodeHooks();
   }
 }

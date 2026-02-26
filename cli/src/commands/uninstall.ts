@@ -3,7 +3,8 @@ import pc from 'picocolors';
 import { join } from 'node:path';
 import { readManifest, removeManifest } from '../manifest.js';
 import { agents } from '../agents/registry.js';
-import { uninstallClaudeCodeExtras } from '../agents/claude-code.js';
+import { uninstallAgentMdSection } from '../agents/agent-md.js';
+import { uninstallClaudeCodeHooks } from '../agents/claude-code.js';
 import { uninstallMcpConfig } from '../mcp.js';
 import { removeDir, pruneEmptyParents, home } from '../utils.js';
 import { getVersion } from '../version.js';
@@ -46,8 +47,12 @@ export async function uninstall(): Promise<void> {
     pruneEmptyParents(config.globalSkillDir, home);
 
     // Remove extras
-    if (agentId === 'claude-code') {
-      uninstallClaudeCodeExtras();
+    const agentExtras = manifest.agents[agentId]?.extras ?? [];
+    if (agentExtras.includes('agent-md') && config.agentMdPath) {
+      uninstallAgentMdSection(config.agentMdPath);
+    }
+    if (agentId === 'claude-code' && agentExtras.includes('hooks')) {
+      uninstallClaudeCodeHooks();
     }
 
     // Remove MCP config

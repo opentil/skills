@@ -190,11 +190,14 @@ function checkExtra(agentId: string, extra: ExtraType): CheckResult {
       );
       return { label, ok: !!hasOpentilHook, detail: hasOpentilHook ? undefined : 'Hook not found in hooks.json' };
     }
-    case 'claude-md': {
-      const claudeMdPath = join(home, '.claude', 'CLAUDE.md');
-      const content = readTextFile(claudeMdPath);
+    case 'agent-md': {
+      const agentMdPath = config.agentMdPath;
+      if (!agentMdPath) {
+        return { label, ok: false, detail: 'No agentMdPath configured' };
+      }
+      const content = readTextFile(agentMdPath);
       const hasSection = content?.includes('<!-- opentil:start -->');
-      return { label, ok: !!hasSection, detail: hasSection ? undefined : 'Section not found in CLAUDE.md' };
+      return { label, ok: !!hasSection, detail: hasSection ? undefined : `Section not found in ${agentMdPath}` };
     }
     default:
       return { label, ok: false, detail: `Unknown extra: ${extra} (re-run installer to fix)` };

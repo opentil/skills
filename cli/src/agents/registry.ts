@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { home } from '../utils.js';
 
-export type ExtraType = 'hooks' | 'claude-md';
+export type ExtraType = 'hooks' | 'agent-md';
 
 export interface AgentConfig {
   name: string;
@@ -11,6 +11,7 @@ export interface AgentConfig {
   detectDirs?: string[];
   globalSkillDir: string;
   extras: ExtraType[];
+  agentMdPath?: string;
   mcpConfigPath?: string;
 }
 
@@ -40,7 +41,8 @@ export const agents: Record<string, AgentConfig> = {
     displayName: 'Claude Code',
     detect: () => existsSync(claudeHome),
     globalSkillDir: join(claudeHome, 'skills'),
-    extras: ['hooks', 'claude-md'],
+    extras: ['hooks', 'agent-md'],
+    agentMdPath: join(claudeHome, 'CLAUDE.md'),
     mcpConfigPath: join(home, '.claude.json'),
   },
 
@@ -94,7 +96,8 @@ export const agents: Record<string, AgentConfig> = {
     detect: () => existsSync(codexHome) || existsSync('/etc/codex'),
     detectDirs: [codexHome, '/etc/codex'],
     globalSkillDir: join(codexHome, 'skills'),
-    extras: [],
+    extras: ['agent-md'],
+    agentMdPath: join(codexHome, 'AGENTS.md'),
   },
   'command-code': {
     name: 'command-code',
@@ -144,7 +147,8 @@ export const agents: Record<string, AgentConfig> = {
     displayName: 'Gemini CLI',
     detect: () => existsSync(join(home, '.gemini')),
     globalSkillDir: join(home, '.gemini', 'skills'),
-    extras: [],
+    extras: ['agent-md'],
+    agentMdPath: join(home, '.gemini', 'GEMINI.md'),
   },
   'github-copilot': {
     name: 'github-copilot',
@@ -236,7 +240,8 @@ export const agents: Record<string, AgentConfig> = {
     displayName: 'OpenCode',
     detect: () => existsSync(join(configHome, 'opencode')),
     globalSkillDir: join(configHome, 'opencode', 'skills'),
-    extras: [],
+    extras: ['agent-md'],
+    agentMdPath: join(configHome, 'opencode', 'AGENTS.md'),
   },
   openclaw: {
     name: 'openclaw',
