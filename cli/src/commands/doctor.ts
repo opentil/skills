@@ -70,6 +70,17 @@ export async function doctor(): Promise<void> {
       const result = checkExtra(agentId, extra);
       checks.push(result);
     }
+
+    // Check MCP
+    if (agentManifest.mcp && config.mcpConfigPath) {
+      const mcpConfig = readJsonFile<{ mcpServers?: Record<string, unknown> }>(config.mcpConfigPath);
+      const hasMcp = !!mcpConfig?.mcpServers?.opentil;
+      checks.push({
+        label: `${config.displayName}: MCP Server`,
+        ok: hasMcp,
+        detail: hasMcp ? undefined : 'MCP config not found',
+      });
+    }
   }
 
   // Check token

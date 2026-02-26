@@ -4,6 +4,7 @@ import { detectAgents, type DetectedAgent } from '../agents/detect.js';
 import { agents, type ExtraType } from '../agents/registry.js';
 import { installSkillFiles } from '../skill-content.js';
 import { installClaudeCodeExtras, uninstallClaudeCodeExtras } from '../agents/claude-code.js';
+import { installMcpConfig, uninstallMcpConfig } from '../mcp.js';
 import { removeDir } from '../utils.js';
 import { readManifest, writeManifest, createManifest, updateManifest, type Manifest } from '../manifest.js';
 import { join } from 'node:path';
@@ -147,21 +148,66 @@ export async function install(): Promise<void> {
     s.stop(`${config.displayName}: skill${extrasLabel}`);
   }
 
+  // Phase 3: MCP Server installation
+  const mcpCapableAgents = selectedAgentIds.filter((id) => agents[id].mcpConfigPath);
+
+  if (mcpCapableAgents.length > 0) {
+    const existingMcpAgents = existingManifest
+      ? mcpCapableAgents.filter((id) => existingManifest.agents[id]?.mcp)
+      : [];
+
+    const mcpSelection = await p.multiselect({
+      message: 'Enable MCP Server? (lets agents search your TIL knowledge base)',
+      options: mcpCapableAgents.map((id) => ({
+        value: id,
+        label: agents[id].displayName,
+      })),
+      initialValues: existingMcpAgents.length > 0 ? existingMcpAgents : mcpCapableAgents,
+      required: false,
+    });
+
+    if (!p.isCancel(mcpSelection)) {
+      const selectedMcp = mcpSelection as string[];
+
+      for (const agentId of mcpCapableAgents) {
+        const config = agents[agentId];
+        if (selectedMcp.includes(agentId)) {
+          s.start(`Configuring MCP for ${config.displayName}...`);
+          installMcpConfig(config.mcpConfigPath!);
+          manifest.agents[agentId].mcp = true;
+          s.stop(`${config.displayName}: MCP configured`);
+        } else if (existingManifest?.agents[agentId]?.mcp) {
+          // Previously had MCP, now deselected — remove it
+          s.start(`Removing MCP from ${config.displayName}...`);
+          uninstallMcpConfig(config.mcpConfigPath!);
+          s.stop(`${config.displayName}: MCP removed`);
+        }
+      }
+    }
+  }
+
   // Write manifest
   writeManifest(manifest);
 
   // Next steps
+  const mcpAgents = selectedAgentIds.filter((id) => manifest.agents[id]?.mcp);
+  const mcpLine = mcpAgents.length > 0
+    ? `  MCP Server: ${mcpAgents.map((id) => agents[id].displayName).join(', ')}`
+    : '';
+
   p.note(
     [
       `Skill installed for: ${selectedAgentIds.map((id) => agents[id].displayName).join(', ')}`,
+      mcpLine,
       '',
       'Next steps:',
       '  1. Get a token at https://opentil.ai/dashboard/settings/tokens',
       '  2. Set it: export OPENTIL_TOKEN="til_xxx"',
       '  3. Use /til in your agent to capture insights!',
+      mcpAgents.length > 0 ? '  4. MCP tools are ready — agents can search your TIL knowledge base' : '',
       '',
       `Re-run ${pc.cyan('npx @opentil/cli')} to modify your setup.`,
-    ].join('\n'),
+    ].filter(Boolean).join('\n'),
     'Setup complete'
   );
 
@@ -174,5 +220,11 @@ function removeAgentSkill(agentId: string, globalSkillDir: string): void {
 
   if (agentId === 'claude-code') {
     uninstallClaudeCodeExtras();
+  }
+
+  // Remove MCP config if present
+  const config = agents[agentId];
+  if (config?.mcpConfigPath) {
+    uninstallMcpConfig(config.mcpConfigPath);
   }
 }

@@ -10,3 +10,7 @@ fork.md
 # CLI build artifacts
 cli/node_modules/
 cli/dist/
+
+# MCP build artifacts
+mcp/node_modules/
+mcp/dist/

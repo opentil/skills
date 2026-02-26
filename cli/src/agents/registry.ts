@@ -10,6 +10,7 @@ export interface AgentConfig {
   detect: () => boolean;
   globalSkillDir: string;
   extras: ExtraType[];
+  mcpConfigPath?: string;
 }
 
 const codexHome = process.env.CODEX_HOME?.trim() || join(home, '.codex');
@@ -39,6 +40,7 @@ export const agents: Record<string, AgentConfig> = {
     detect: () => existsSync(claudeHome),
     globalSkillDir: join(claudeHome, 'skills'),
     extras: ['hooks', 'claude-md'],
+    mcpConfigPath: join(home, '.claude.json'),
   },
 
   // --- Standard agents (alphabetical) ---
@@ -125,6 +127,7 @@ export const agents: Record<string, AgentConfig> = {
     detect: () => existsSync(join(home, '.cursor')),
     globalSkillDir: join(home, '.cursor', 'skills'),
     extras: [],
+    mcpConfigPath: join(home, '.cursor', 'mcp.json'),
   },
   droid: {
     name: 'droid',
@@ -310,6 +313,7 @@ export const agents: Record<string, AgentConfig> = {
     detect: () => existsSync(join(home, '.codeium', 'windsurf')),
     globalSkillDir: join(home, '.codeium', 'windsurf', 'skills'),
     extras: [],
+    mcpConfigPath: join(home, '.codeium', 'windsurf', 'mcp_config.json'),
   },
   zencoder: {
     name: 'zencoder',

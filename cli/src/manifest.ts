@@ -5,6 +5,7 @@ import type { ExtraType } from './agents/registry.js';
 export interface AgentManifest {
   skill: boolean;
   extras: ExtraType[];
+  mcp?: boolean;
 }
 
 export interface Manifest {

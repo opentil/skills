@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { readManifest, removeManifest } from '../manifest.js';
 import { agents } from '../agents/registry.js';
 import { uninstallClaudeCodeExtras } from '../agents/claude-code.js';
+import { uninstallMcpConfig } from '../mcp.js';
 import { removeDir } from '../utils.js';
 import { getVersion } from '../version.js';
 
@@ -45,6 +46,11 @@ export async function uninstall(): Promise<void> {
     // Remove extras
     if (agentId === 'claude-code') {
       uninstallClaudeCodeExtras();
+    }
+
+    // Remove MCP config
+    if (config.mcpConfigPath) {
+      uninstallMcpConfig(config.mcpConfigPath);
     }
 
     s.stop(`${config.displayName}: removed`);
