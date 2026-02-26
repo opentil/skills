@@ -201,6 +201,10 @@ export async function install(): Promise<void> {
   // MCP Server installation — only offer when authenticated (token available)
   const mcpCapableAgents = selectedAgentIds.filter((id) => agents[id].mcpConfigPath);
 
+  if (mcpCapableAgents.length > 0 && !authResult.authenticated) {
+    p.log.info(`MCP Server skipped — connect your account first to enable knowledge base search`);
+  }
+
   if (mcpCapableAgents.length > 0 && authResult.authenticated) {
     const mcpToken = authResult.token;
     const existingMcpAgents = existingManifest
