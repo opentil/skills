@@ -122,7 +122,8 @@ export async function install(): Promise<void> {
       continue;
     }
 
-    const existingExtras = existingManifest?.agents[agentId]?.extras ?? config.extras;
+    const existingExtras = (existingManifest?.agents[agentId]?.extras ?? config.extras)
+      .filter((e: ExtraType) => config.extras.includes(e));
 
     const extras = await p.multiselect({
       message: `${config.displayName} extras:`,
