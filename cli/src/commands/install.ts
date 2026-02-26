@@ -9,6 +9,7 @@ import { removeDir } from '../utils.js';
 import { readManifest, writeManifest, createManifest, updateManifest, type Manifest } from '../manifest.js';
 import { join } from 'node:path';
 import { getVersion, checkLatestVersion } from '../version.js';
+import { runAuthPhase } from '../auth.js';
 
 const EXTRA_LABELS: Record<ExtraType, string> = {
   hooks: 'Hooks (auto-detection reminders)',
@@ -189,27 +190,48 @@ export async function install(): Promise<void> {
   // Write manifest
   writeManifest(manifest);
 
-  // Next steps
+  // Phase 4: Authentication
+  const authResult = await runAuthPhase();
+
+  // Summary
   const mcpAgents = selectedAgentIds.filter((id) => manifest.agents[id]?.mcp);
   const mcpLine = mcpAgents.length > 0
     ? `  MCP Server: ${mcpAgents.map((id) => agents[id].displayName).join(', ')}`
     : '';
+  const mcpToolsLine = mcpAgents.length > 0
+    ? '  MCP tools are ready — agents can search your TIL knowledge base'
+    : '';
 
-  p.note(
-    [
-      `Skill installed for: ${selectedAgentIds.map((id) => agents[id].displayName).join(', ')}`,
-      mcpLine,
-      '',
-      'Next steps:',
-      '  1. Get a token at https://opentil.ai/dashboard/settings/tokens',
-      '  2. Set it: export OPENTIL_TOKEN="til_xxx"',
-      '  3. Use /til in your agent to capture insights!',
-      mcpAgents.length > 0 ? '  4. MCP tools are ready — agents can search your TIL knowledge base' : '',
-      '',
-      `Re-run ${pc.cyan('npx @opentil/cli')} to modify your setup.`,
-    ].filter(Boolean).join('\n'),
-    'Setup complete'
-  );
+  if (authResult.authenticated) {
+    p.note(
+      [
+        `Skill installed for: ${selectedAgentIds.map((id) => agents[id].displayName).join(', ')}`,
+        mcpLine,
+        `  Account: @${authResult.username}`,
+        '',
+        'Use /til in your agent to capture insights!',
+        mcpToolsLine,
+        '',
+        `Re-run ${pc.cyan('npx @opentil/cli')} to modify your setup.`,
+      ].filter(Boolean).join('\n'),
+      'Setup complete'
+    );
+  } else {
+    p.note(
+      [
+        `Skill installed for: ${selectedAgentIds.map((id) => agents[id].displayName).join(', ')}`,
+        mcpLine,
+        '',
+        'Next steps:',
+        '  1. Run /til auth in your agent to connect your account',
+        '  2. Use /til in your agent to capture insights!',
+        mcpToolsLine,
+        '',
+        `Re-run ${pc.cyan('npx @opentil/cli')} to modify your setup.`,
+      ].filter(Boolean).join('\n'),
+      'Setup complete'
+    );
+  }
 
   p.outro('Happy TIL-ing!');
 }
