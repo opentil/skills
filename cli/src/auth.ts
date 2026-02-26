@@ -110,7 +110,7 @@ export async function runAuthPhase(): Promise<AuthResult> {
 
 // ─── Credential reading ─────────────────────────────────────────────
 
-function readExistingCredentials(): Credentials | null {
+export function readExistingCredentials(): Credentials | null {
   // 1. Environment variable
   const envToken = process.env.OPENTIL_TOKEN;
   if (envToken) {
@@ -141,7 +141,7 @@ function readExistingCredentials(): Credentials | null {
 
 // ─── Token validation ───────────────────────────────────────────────
 
-async function validateToken(token: string, host: string): Promise<string | null> {
+export async function validateToken(token: string, host: string): Promise<string | null> {
   try {
     const res = await fetch(`${host}/api/v1/site`, {
       headers: { Authorization: `Bearer ${token}` },

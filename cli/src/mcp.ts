@@ -27,12 +27,12 @@ const MCP_SERVER_KEY = 'opentil';
 const MCP_HTTP_URL = 'https://opentil.ai/mcp';
 
 // Remote HTTP config (recommended — zero install)
-function httpConfig(): HttpServerEntry {
+function httpConfig(token: string): HttpServerEntry {
   return {
     type: 'http',
     url: MCP_HTTP_URL,
     headers: {
-      Authorization: 'Bearer ${OPENTIL_TOKEN}',
+      Authorization: `Bearer ${token}`,
     },
   };
 }
@@ -48,14 +48,12 @@ function stdioConfig(): StdioServerEntry {
 
 // --- Public API ---
 
-export type McpTransport = 'http' | 'stdio';
-
-export function installMcpConfig(configPath: string, transport: McpTransport = 'http'): void {
+export function installMcpConfig(configPath: string, token?: string): void {
   const config = readJsonFile<McpConfigFile>(configPath) ?? {};
   if (!config.mcpServers) {
     config.mcpServers = {};
   }
-  config.mcpServers[MCP_SERVER_KEY] = transport === 'http' ? httpConfig() : stdioConfig();
+  config.mcpServers[MCP_SERVER_KEY] = token ? httpConfig(token) : stdioConfig();
   writeJsonFile(configPath, config);
 }
 

@@ -9,7 +9,7 @@ import { removeDir } from '../utils.js';
 import { readManifest, writeManifest, createManifest, updateManifest, type Manifest } from '../manifest.js';
 import { join } from 'node:path';
 import { getVersion, checkLatestVersion } from '../version.js';
-import { runAuthPhase } from '../auth.js';
+import { runAuthPhase, readExistingCredentials, validateToken } from '../auth.js';
 
 const EXTRA_LABELS: Record<ExtraType, string> = {
   hooks: 'Hooks (auto-detection reminders)',
@@ -149,7 +149,20 @@ export async function install(): Promise<void> {
     s.stop(`${config.displayName}: skill${extrasLabel}`);
   }
 
-  // Phase 3: MCP Server installation
+  // Phase 3: Authentication (before MCP, so we have a token for HTTP transport)
+  const authResult = await runAuthPhase();
+
+  // Resolve token for MCP HTTP transport
+  let mcpToken: string | undefined;
+  if (authResult.authenticated) {
+    const creds = readExistingCredentials();
+    if (creds) {
+      const username = await validateToken(creds.token, creds.host);
+      if (username) mcpToken = creds.token;
+    }
+  }
+
+  // Phase 4: MCP Server installation
   const mcpCapableAgents = selectedAgentIds.filter((id) => agents[id].mcpConfigPath);
 
   if (mcpCapableAgents.length > 0) {
@@ -174,9 +187,10 @@ export async function install(): Promise<void> {
         const config = agents[agentId];
         if (selectedMcp.includes(agentId)) {
           s.start(`Configuring MCP for ${config.displayName}...`);
-          installMcpConfig(config.mcpConfigPath!);
+          installMcpConfig(config.mcpConfigPath!, mcpToken);
+          const transport = mcpToken ? 'HTTP' : 'stdio';
           manifest.agents[agentId].mcp = true;
-          s.stop(`${config.displayName}: MCP configured`);
+          s.stop(`${config.displayName}: MCP configured (${transport})`);
         } else if (existingManifest?.agents[agentId]?.mcp) {
           // Previously had MCP, now deselected — remove it
           s.start(`Removing MCP from ${config.displayName}...`);
@@ -189,9 +203,6 @@ export async function install(): Promise<void> {
 
   // Write manifest
   writeManifest(manifest);
-
-  // Phase 4: Authentication
-  const authResult = await runAuthPhase();
 
   // Summary
   const mcpAgents = selectedAgentIds.filter((id) => manifest.agents[id]?.mcp);
