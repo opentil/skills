@@ -12,6 +12,7 @@ import { readManifest, writeManifest, createManifest, updateManifest, type Manif
 import { join } from 'node:path';
 import { getVersion, checkLatestVersion } from '../version.js';
 import { runAuthPhase } from '../auth.js';
+import { showLogo } from '../logo.js';
 
 const EXTRA_LABELS: Record<ExtraType, string> = {
   hooks: 'Hooks (auto-detection reminders)',
@@ -44,6 +45,7 @@ export function shouldUseFastPath(
 export async function install(): Promise<void> {
   const version = getVersion();
 
+  showLogo();
   p.intro(`${pc.bgCyan(pc.black(' OpenTIL '))} v${version}`);
 
   // Phase 0: Pre-checks
