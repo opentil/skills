@@ -15,7 +15,7 @@ export interface Manifest {
   agents: Record<string, AgentManifest>;
 }
 
-const MANIFEST_PATH = join(home, '.opentil', 'manifest.json');
+const MANIFEST_PATH = join(home, '.til', 'manifest.json');
 
 export function readManifest(): Manifest | null {
   return readJsonFile<Manifest>(MANIFEST_PATH);

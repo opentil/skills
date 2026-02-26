@@ -568,7 +568,7 @@ TIL captured
 
 After the first successful API call in a conversation, check the installed skill age:
 
-1. Read `~/.opentil/manifest.json` and parse `updatedAt` (ISO timestamp)
+1. Read `~/.til/manifest.json` and parse `updatedAt` (ISO timestamp)
 2. If `updatedAt` is more than 30 days ago, append after the success message:
    ```
    Tip: Skill installed 45 days ago. Run npx @opentil/cli@latest to check for updates.

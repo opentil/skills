@@ -79,10 +79,6 @@ export async function runAuthPhase(): Promise<AuthResult> {
     return freshAuthFlow(host);
   }
 
-  if (profileCount === 1) {
-    return singleProfileFlow(parsed, host);
-  }
-
   return multiProfileFlow(parsed, host);
 }
 
@@ -131,22 +127,6 @@ async function freshAuthFlow(host: string): Promise<AuthResult> {
     return { authenticated: true, username: pasteResult.username };
   }
   return { authenticated: false };
-}
-
-async function singleProfileFlow(parsed: CredentialsFile, host: string): Promise<AuthResult> {
-  const activeName = parsed.active || 'default';
-  const profile = parsed.profiles[activeName] || Object.values(parsed.profiles)[0];
-  if (!profile?.token) return freshAuthFlow(host);
-
-  const profileHost = profile.host || host;
-  const username = await validateToken(profile.token, profileHost);
-  if (username) {
-    p.log.success(`Already connected as ${pc.green(`@${username}`)}`);
-    return { authenticated: true, username };
-  }
-
-  p.log.warn('Saved token is no longer valid');
-  return freshAuthFlow(host);
 }
 
 async function multiProfileFlow(parsed: CredentialsFile, host: string): Promise<AuthResult> {
