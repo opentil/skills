@@ -5,7 +5,7 @@ import { readManifest, removeManifest } from '../manifest.js';
 import { agents } from '../agents/registry.js';
 import { uninstallClaudeCodeExtras } from '../agents/claude-code.js';
 import { uninstallMcpConfig } from '../mcp.js';
-import { removeDir } from '../utils.js';
+import { removeDir, pruneEmptyParents, home } from '../utils.js';
 import { getVersion } from '../version.js';
 
 export async function uninstall(): Promise<void> {
@@ -42,6 +42,8 @@ export async function uninstall(): Promise<void> {
 
     // Remove skill files
     removeDir(join(config.globalSkillDir, 'til'));
+    // Prune empty parent directories left by the installer
+    pruneEmptyParents(config.globalSkillDir, home);
 
     // Remove extras
     if (agentId === 'claude-code') {

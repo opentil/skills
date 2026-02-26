@@ -8,6 +8,7 @@ export interface AgentConfig {
   name: string;
   displayName: string;
   detect: () => boolean;
+  detectDirs?: string[];
   globalSkillDir: string;
   extras: ExtraType[];
   mcpConfigPath?: string;
@@ -55,6 +56,7 @@ export const agents: Record<string, AgentConfig> = {
     name: 'amp',
     displayName: 'Amp',
     detect: () => existsSync(join(configHome, 'amp')),
+    detectDirs: [join(configHome, 'amp')],
     globalSkillDir: join(configHome, 'agents', 'skills'),
     extras: [],
   },
@@ -90,6 +92,7 @@ export const agents: Record<string, AgentConfig> = {
     name: 'codex',
     displayName: 'Codex',
     detect: () => existsSync(codexHome) || existsSync('/etc/codex'),
+    detectDirs: [codexHome, '/etc/codex'],
     globalSkillDir: join(codexHome, 'skills'),
     extras: [],
   },
@@ -182,6 +185,7 @@ export const agents: Record<string, AgentConfig> = {
     name: 'kimi-cli',
     displayName: 'Kimi Code CLI',
     detect: () => existsSync(join(home, '.kimi')),
+    detectDirs: [join(home, '.kimi')],
     globalSkillDir: join(configHome, 'agents', 'skills'),
     extras: [],
   },
@@ -241,6 +245,7 @@ export const agents: Record<string, AgentConfig> = {
       existsSync(join(home, '.openclaw')) ||
       existsSync(join(home, '.clawdbot')) ||
       existsSync(join(home, '.moltbot')),
+    detectDirs: [join(home, '.openclaw'), join(home, '.clawdbot'), join(home, '.moltbot')],
     globalSkillDir: getOpenClawGlobalSkillDir(),
     extras: [],
   },
@@ -283,6 +288,7 @@ export const agents: Record<string, AgentConfig> = {
     name: 'replit',
     displayName: 'Replit',
     detect: () => existsSync(join(process.cwd(), '.replit')),
+    detectDirs: [],
     globalSkillDir: join(configHome, 'agents', 'skills'),
     extras: [],
   },

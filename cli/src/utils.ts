@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, cpSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, cpSync, rmSync, rmdirSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { homedir } from 'node:os';
 
@@ -58,5 +58,22 @@ export function removeDir(path: string): void {
     rmSync(path, { recursive: true, force: true });
   } catch {
     // ignore
+  }
+}
+
+export function pruneEmptyParents(dir: string, stopAt: string): void {
+  let current = dir;
+  while (current !== stopAt && current !== dirname(current)) {
+    try {
+      const entries = readdirSync(current);
+      if (entries.length === 0) {
+        rmdirSync(current);
+        current = dirname(current);
+      } else {
+        break;
+      }
+    } catch {
+      break;
+    }
   }
 }

@@ -6,6 +6,7 @@ import { readManifest } from '../manifest.js';
 import { agents, type ExtraType } from '../agents/registry.js';
 import { home, readJsonFile, readTextFile } from '../utils.js';
 import { getVersion, checkLatestVersion } from '../version.js';
+import { validateToken, readExistingCredentials } from '../auth.js';
 
 interface CheckResult {
   label: string;
@@ -83,18 +84,77 @@ export async function doctor(): Promise<void> {
     }
   }
 
-  // Check token
-  const hasToken = !!process.env.OPENTIL_TOKEN;
+  // ── Env var conflict check ────────────────────────────────────────
+  const hasEnvToken = !!process.env.OPENTIL_TOKEN;
   const hasCredentials = existsSync(join(home, '.til', 'credentials'));
-  checks.push({
-    label: 'Token / credentials',
-    ok: hasToken || hasCredentials,
-    detail: hasToken
-      ? 'OPENTIL_TOKEN set'
-      : hasCredentials
-        ? '~/.til/credentials found'
-        : 'No token found. Set OPENTIL_TOKEN or run /til auth',
-  });
+
+  if (hasEnvToken && hasCredentials) {
+    checks.push({
+      label: 'Env var conflict',
+      ok: false,
+      detail: 'OPENTIL_TOKEN overrides ~/.til/credentials — run "unset OPENTIL_TOKEN" to use saved accounts',
+    });
+  }
+
+  // ── Token validation (tri-state) ──────────────────────────────────
+  const creds = readExistingCredentials();
+  if (creds) {
+    const v = await validateToken(creds.token, creds.host);
+    const source = creds.source === 'env' ? 'OPENTIL_TOKEN' : '~/.til/credentials';
+    if (v.status === 'valid') {
+      checks.push({
+        label: 'Token / credentials',
+        ok: true,
+        detail: `@${v.username} via ${source}`,
+      });
+    } else if (v.status === 'expired') {
+      checks.push({
+        label: 'Token / credentials',
+        ok: false,
+        detail: `Token expired (${source})`,
+      });
+    } else {
+      checks.push({
+        label: 'Token / credentials',
+        ok: true, // trust cached — not a failure
+        detail: `Network error — cannot verify (${source})`,
+      });
+    }
+  } else {
+    checks.push({
+      label: 'Token / credentials',
+      ok: false,
+      detail: 'No token found. Set OPENTIL_TOKEN or run /til auth',
+    });
+  }
+
+  // ── MCP token sync check ──────────────────────────────────────────
+  if (creds) {
+    for (const [agentId, agentManifest] of Object.entries(manifest.agents)) {
+      if (!agentManifest.mcp) continue;
+      const config = agents[agentId];
+      if (!config?.mcpConfigPath) continue;
+
+      const mcpConfig = readJsonFile<{
+        mcpServers?: Record<string, { headers?: Record<string, string> }>;
+      }>(config.mcpConfigPath);
+      const mcpEntry = mcpConfig?.mcpServers?.opentil;
+      if (!mcpEntry) continue;
+
+      // Check if the MCP config has a Bearer token that matches the active credential
+      const authHeader = mcpEntry.headers?.Authorization;
+      if (authHeader) {
+        const mcpTokenMatch = authHeader.match(/^Bearer\s+(.+)$/);
+        const mcpToken = mcpTokenMatch?.[1];
+        const synced = mcpToken === creds.token;
+        checks.push({
+          label: `${config.displayName}: MCP token sync`,
+          ok: synced,
+          detail: synced ? undefined : 'MCP token differs from active credential — re-run installer to sync',
+        });
+      }
+    }
+  }
 
   // Display results
   let allOk = true;
@@ -121,12 +181,12 @@ function checkExtra(agentId: string, extra: ExtraType): CheckResult {
       const hooksPath = join(home, '.claude', 'hooks.json');
       const hooks = readJsonFile<{ hooks: Record<string, unknown[]> }>(hooksPath);
       const hasOpentilHook = hooks?.hooks?.PostToolUse?.some(
-        (h: unknown) => (h as { matcher?: string }).matcher?.includes('ExitPlanMode')
+        (h: unknown) => (h as { matcher?: string }).matcher?.includes('ExitPlanMode'),
       ) || hooks?.hooks?.Stop?.some(
         (h: unknown) => {
           const entry = h as { hooks?: Array<{ command?: string }> };
           return entry.hooks?.some((hook) => hook.command?.includes('OpenTIL'));
-        }
+        },
       );
       return { label, ok: !!hasOpentilHook, detail: hasOpentilHook ? undefined : 'Hook not found in hooks.json' };
     }

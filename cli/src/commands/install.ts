@@ -1,6 +1,7 @@
 import * as p from '@clack/prompts';
 import pc from 'picocolors';
-import { detectAgents, type DetectedAgent } from '../agents/detect.js';
+import { existsSync } from 'node:fs';
+import { detectAgents, cleanupInstallerDirs, type DetectedAgent } from '../agents/detect.js';
 import { agents, type ExtraType } from '../agents/registry.js';
 import { installSkillFiles } from '../skill-content.js';
 import { installClaudeCodeExtras, uninstallClaudeCodeExtras } from '../agents/claude-code.js';
@@ -9,22 +10,52 @@ import { removeDir } from '../utils.js';
 import { readManifest, writeManifest, createManifest, updateManifest, type Manifest } from '../manifest.js';
 import { join } from 'node:path';
 import { getVersion, checkLatestVersion } from '../version.js';
-import { runAuthPhase, readExistingCredentials, validateToken } from '../auth.js';
+import { runAuthPhase } from '../auth.js';
 
 const EXTRA_LABELS: Record<ExtraType, string> = {
   hooks: 'Hooks (auto-detection reminders)',
   'claude-md': 'CLAUDE.md (TIL auto-detection section)',
 };
 
+// ─── Fast path detection ────────────────────────────────────────────
+
+function shouldUseFastPath(
+  manifest: Manifest | null,
+  installedAgents: DetectedAgent[],
+): boolean {
+  if (!manifest) return false;
+  const manifestAgentIds = Object.keys(manifest.agents);
+  if (manifestAgentIds.length === 0) return false;
+
+  const installedIds = new Set(installedAgents.map((a) => a.id));
+
+  // All manifest agents must still be detected
+  const allStillDetected = manifestAgentIds.every((id) => installedIds.has(id));
+  if (!allStillDetected) return false;
+
+  // No new agents beyond what's in the manifest
+  const noNewAgents = installedAgents.every((a) => manifestAgentIds.includes(a.id));
+  return noNewAgents;
+}
+
+// ─── Main install flow ──────────────────────────────────────────────
+
 export async function install(): Promise<void> {
   const version = getVersion();
 
   p.intro(`${pc.bgCyan(pc.black(' OpenTIL '))} v${version}`);
 
+  // Phase 0: Pre-checks
   const versionCheck = await checkLatestVersion();
   if (versionCheck?.isOutdated) {
     p.log.warn(`Update available: ${pc.dim(`v${versionCheck.current}`)} → ${pc.green(`v${versionCheck.latest}`)}`);
     p.log.info(`  Run: ${pc.cyan('npx @opentil/cli@latest')}`);
+  }
+
+  // Clean up directories created by previous installer runs
+  const cleanedDirs = cleanupInstallerDirs();
+  if (cleanedDirs.length > 0) {
+    p.log.info(`Cleaned up ${cleanedDirs.length} installer-created ${cleanedDirs.length === 1 ? 'directory' : 'directories'}`);
   }
 
   // Phase 1: Detect agents
@@ -40,13 +71,24 @@ export async function install(): Promise<void> {
   }
 
   p.log.info(
-    `Detected: ${installedAgents.map((a) => pc.green(a.config.displayName)).join(', ')}`
+    `Detected: ${installedAgents.map((a) => pc.green(a.config.displayName)).join(', ')}`,
   );
 
-  // Read existing manifest for pre-selection
+  // Read existing manifest
   const existingManifest = readManifest();
+  const fastPath = shouldUseFastPath(existingManifest, installedAgents);
 
-  // Phase 1: Select agents
+  // Phase 2: Authentication (before agent selection)
+  const authResult = await runAuthPhase({ fastPath });
+
+  if (fastPath && existingManifest) {
+    // ── Fast path: skip interactive selection, reuse manifest config ──
+    return fastPathInstall(existingManifest, version, authResult, installedAgents);
+  }
+
+  // ── Interactive path ──────────────────────────────────────────────
+
+  // Phase 3: Agent selection
   const agentSelection = await p.multiselect({
     message: 'Which agents should have the TIL skill?',
     options: installedAgents.map((a) => ({
@@ -57,7 +99,7 @@ export async function install(): Promise<void> {
         : undefined,
     })),
     initialValues: existingManifest
-      ? Object.keys(existingManifest.agents)
+      ? Object.keys(existingManifest.agents).filter((id) => installedAgents.some((a) => a.id === id))
       : installedAgents.map((a) => a.id),
     required: true,
   });
@@ -69,7 +111,7 @@ export async function install(): Promise<void> {
 
   const selectedAgentIds = agentSelection as string[];
 
-  // Phase 1: Per-agent extras selection
+  // Per-agent extras selection
   const agentExtras: Record<string, ExtraType[]> = {};
 
   for (const agentId of selectedAgentIds) {
@@ -99,7 +141,7 @@ export async function install(): Promise<void> {
     agentExtras[agentId] = extras as ExtraType[];
   }
 
-  // Phase 2: Execute installation
+  // Phase 4: Execute installation
   const s = p.spinner();
 
   // Build manifest
@@ -113,13 +155,20 @@ export async function install(): Promise<void> {
     ? Object.keys(existingManifest.agents).filter((id) => !selectedAgentIds.includes(id))
     : [];
 
-  // Uninstall removed agents
+  // Uninstall removed agents (with ghost suppression)
   for (const agentId of agentsToRemove) {
     const config = agents[agentId];
     if (!config) continue;
-    s.start(`Removing TIL from ${config.displayName}...`);
-    removeAgentSkill(agentId, config.globalSkillDir);
-    s.stop(`${config.displayName} removed`);
+    const skillDir = join(config.globalSkillDir, 'til');
+    // Ghost suppression: only show removal message if skill dir actually exists on disk
+    if (existsSync(skillDir)) {
+      s.start(`Removing TIL from ${config.displayName}...`);
+      removeAgentSkill(agentId, config.globalSkillDir);
+      s.stop(`${config.displayName} removed`);
+    } else {
+      // Silently clean up manifest entry — no disk presence, no message
+      removeAgentSkill(agentId, config.globalSkillDir);
+    }
   }
 
   // Install/update selected agents
@@ -149,20 +198,8 @@ export async function install(): Promise<void> {
     s.stop(`${config.displayName}: skill${extrasLabel}`);
   }
 
-  // Phase 3: Authentication (before MCP, so we have a token for HTTP transport)
-  const authResult = await runAuthPhase();
-
-  // Resolve token for MCP HTTP transport
-  let mcpToken: string | undefined;
-  if (authResult.authenticated) {
-    const creds = readExistingCredentials();
-    if (creds) {
-      const username = await validateToken(creds.token, creds.host);
-      if (username) mcpToken = creds.token;
-    }
-  }
-
-  // Phase 4: MCP Server installation
+  // MCP Server installation
+  const mcpToken = authResult.token;
   const mcpCapableAgents = selectedAgentIds.filter((id) => agents[id].mcpConfigPath);
 
   if (mcpCapableAgents.length > 0) {
@@ -205,6 +242,71 @@ export async function install(): Promise<void> {
   writeManifest(manifest);
 
   // Summary
+  showSummary(selectedAgentIds, manifest, authResult);
+}
+
+// ─── Fast path install ──────────────────────────────────────────────
+
+async function fastPathInstall(
+  existingManifest: Manifest,
+  version: string,
+  authResult: Awaited<ReturnType<typeof runAuthPhase>>,
+  _installedAgents: DetectedAgent[],
+): Promise<void> {
+  const s = p.spinner();
+  const selectedAgentIds = Object.keys(existingManifest.agents);
+  const manifest = updateManifest(existingManifest, version);
+
+  // Silently reinstall skill files (update content)
+  s.start('Updating skill files...');
+  for (const agentId of selectedAgentIds) {
+    const config = agents[agentId];
+    if (!config) continue;
+    const skillDir = join(config.globalSkillDir, 'til');
+    installSkillFiles(skillDir);
+
+    // Reinstall extras
+    if (agentId === 'claude-code') {
+      const extras = existingManifest.agents[agentId]?.extras ?? [];
+      installClaudeCodeExtras(extras);
+    }
+  }
+  s.stop(`Updated ${selectedAgentIds.length} agent${selectedAgentIds.length === 1 ? '' : 's'}`);
+
+  // MCP token sync: silently update token in all mcp: true agents
+  const mcpToken = authResult.token;
+  const mcpAgents = selectedAgentIds.filter(
+    (id) => existingManifest.agents[id]?.mcp && agents[id]?.mcpConfigPath,
+  );
+
+  if (mcpAgents.length > 0) {
+    for (const agentId of mcpAgents) {
+      const config = agents[agentId];
+      installMcpConfig(config.mcpConfigPath!, mcpToken);
+    }
+    // Preserve mcp flag in manifest
+    for (const agentId of mcpAgents) {
+      manifest.agents[agentId] = {
+        ...manifest.agents[agentId],
+        mcp: true,
+      };
+    }
+  }
+
+  // Write manifest
+  writeManifest(manifest);
+
+  // Summary
+  showSummary(selectedAgentIds, manifest, authResult);
+}
+
+// ─── Summary ────────────────────────────────────────────────────────
+
+function showSummary(
+  selectedAgentIds: string[],
+  manifest: Manifest,
+  authResult: Awaited<ReturnType<typeof runAuthPhase>>,
+): void {
   const mcpAgents = selectedAgentIds.filter((id) => manifest.agents[id]?.mcp);
   const mcpLine = mcpAgents.length > 0
     ? `  MCP Server: ${mcpAgents.map((id) => agents[id].displayName).join(', ')}`
@@ -225,7 +327,7 @@ export async function install(): Promise<void> {
         '',
         `Re-run ${pc.cyan('npx @opentil/cli')} to modify your setup.`,
       ].filter(Boolean).join('\n'),
-      'Setup complete'
+      'Setup complete',
     );
   } else {
     p.note(
@@ -240,12 +342,14 @@ export async function install(): Promise<void> {
         '',
         `Re-run ${pc.cyan('npx @opentil/cli')} to modify your setup.`,
       ].filter(Boolean).join('\n'),
-      'Setup complete'
+      'Setup complete',
     );
   }
 
   p.outro('Happy TIL-ing!');
 }
+
+// ─── Helpers ────────────────────────────────────────────────────────
 
 function removeAgentSkill(agentId: string, globalSkillDir: string): void {
   const skillDir = join(globalSkillDir, 'til');

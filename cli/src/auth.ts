@@ -1,6 +1,6 @@
 import * as p from '@clack/prompts';
 import pc from 'picocolors';
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { home, ensureDir, readTextFile } from './utils.js';
 import { openBrowser } from './open-browser.js';
@@ -8,10 +8,19 @@ import { openBrowser } from './open-browser.js';
 const DEFAULT_HOST = 'https://opentil.ai';
 const CREDENTIALS_PATH = join(home, '.til', 'credentials');
 
+// ─── Types ───────────────────────────────────────────────────────────
+
+export type TokenValidation =
+  | { status: 'valid'; username: string }
+  | { status: 'expired' }
+  | { status: 'network_error'; error?: string };
+
 export interface AuthResult {
   authenticated: boolean;
   skipped?: boolean;
   username?: string;
+  token?: string;
+  host?: string;
 }
 
 interface Credentials {
@@ -23,6 +32,7 @@ interface Credentials {
 interface Profile {
   token: string;
   host?: string;
+  [key: string]: string | undefined;
 }
 
 interface CredentialsFile {
@@ -42,44 +52,86 @@ interface ValidatedProfile {
   name: string;
   token: string;
   host: string;
-  username: string | null; // null = expired/invalid
+  validation: TokenValidation;
   isActive: boolean;
 }
 
 // ─── Main entry point ───────────────────────────────────────────────
 
-export async function runAuthPhase(): Promise<AuthResult> {
+export async function runAuthPhase(opts?: { fastPath?: boolean }): Promise<AuthResult> {
   if (!process.stdout.isTTY) {
     return { authenticated: false, skipped: true };
   }
 
   const host = process.env.OPENTIL_HOST || DEFAULT_HOST;
-
-  // Environment variable takes precedence — skip selector
   const envToken = process.env.OPENTIL_TOKEN;
-  if (envToken) {
-    const username = await validateToken(envToken, host);
-    if (username) {
-      p.log.success(`Already connected as ${pc.green(`@${username}`)}`);
-      return { authenticated: true, username };
+  const parsed = readCredentialsFile();
+  const hasCredentials = parsed && Object.values(parsed.profiles).some((prof) => prof.token);
+
+  // ── env var + credentials both present → warn conflict, use env token
+  if (envToken && hasCredentials) {
+    p.log.warn(
+      `${pc.yellow('OPENTIL_TOKEN')} env var overrides ~/.til/credentials — run ${pc.cyan('unset OPENTIL_TOKEN')} to use saved accounts`,
+    );
+    const v = await validateToken(envToken, host);
+    if (v.status === 'valid') {
+      p.log.success(`Using env token: ${pc.green(`@${v.username}`)}`);
+      return { authenticated: true, username: v.username, token: envToken, host };
     }
-    p.log.warn('OPENTIL_TOKEN is set but invalid — unset it to re-authenticate');
+    if (v.status === 'expired') {
+      p.log.error('OPENTIL_TOKEN is expired — unset it and re-authenticate');
+      return { authenticated: false };
+    }
+    // network_error — fall through to credentials
+    p.log.warn('Cannot verify OPENTIL_TOKEN (network error) — falling back to saved credentials');
+  }
+
+  // ── Only env var, no credentials
+  if (envToken && !hasCredentials) {
+    const v = await validateToken(envToken, host);
+    if (v.status === 'valid') {
+      p.log.success(`Connected as ${pc.green(`@${v.username}`)}`);
+      return { authenticated: true, username: v.username, token: envToken, host };
+    }
+    if (v.status === 'expired') {
+      p.log.warn('OPENTIL_TOKEN is set but expired — unset it to re-authenticate');
+      return { authenticated: false };
+    }
+    // network_error
+    p.log.warn('Cannot verify OPENTIL_TOKEN (network error)');
     return { authenticated: false, skipped: true };
   }
 
-  // Read credentials file
-  const parsed = readCredentialsFile();
-  if (!parsed) {
+  // ── No credentials at all → fresh auth
+  if (!parsed || !hasCredentials) {
     return freshAuthFlow(host);
   }
 
-  const profileCount = Object.values(parsed.profiles).filter((prof) => prof.token).length;
+  // ── Has credentials — check active profile
+  const activeName = parsed.active || Object.keys(parsed.profiles)[0];
+  const activeProfile = activeName ? parsed.profiles[activeName] : undefined;
 
-  if (profileCount === 0) {
-    return freshAuthFlow(host);
+  if (!activeProfile?.token) {
+    return multiProfileFlow(parsed, host, opts?.fastPath);
   }
 
-  return multiProfileFlow(parsed, host);
+  const activeHost = activeProfile.host || host;
+
+  // Fast path: validate active profile without showing selector
+  if (opts?.fastPath) {
+    const v = await validateToken(activeProfile.token, activeHost);
+    if (v.status === 'valid') {
+      p.log.success(`Using ${pc.green(`@${v.username}`)}`);
+      return { authenticated: true, username: v.username, token: activeProfile.token, host: activeHost };
+    }
+    if (v.status === 'network_error') {
+      p.log.warn(`Cannot verify token (network error) — trusting cached profile ${pc.dim(`@${activeName}`)}`);
+      return { authenticated: true, username: activeName, token: activeProfile.token, host: activeHost };
+    }
+    // expired → fall through to interactive flow
+  }
+
+  return multiProfileFlow(parsed, host, opts?.fastPath);
 }
 
 // ─── Profile flows ──────────────────────────────────────────────────
@@ -103,7 +155,7 @@ async function freshAuthFlow(host: string): Promise<AuthResult> {
     if (result) {
       saveCredentials(result.token, result.username, host);
       p.log.success(`Connected as ${pc.green(`@${result.username}`)}`);
-      return { authenticated: true, username: result.username };
+      return { authenticated: true, username: result.username, token: result.token, host };
     }
     // Device flow failed — offer paste fallback
     const tryPaste = await p.confirm({ message: 'Try pasting a token instead?' });
@@ -114,7 +166,7 @@ async function freshAuthFlow(host: string): Promise<AuthResult> {
     if (pasteResult) {
       saveCredentials(pasteResult.token, pasteResult.username, host);
       p.log.success(`Connected as ${pc.green(`@${pasteResult.username}`)}`);
-      return { authenticated: true, username: pasteResult.username };
+      return { authenticated: true, username: pasteResult.username, token: pasteResult.token, host };
     }
     return { authenticated: false };
   }
@@ -124,17 +176,22 @@ async function freshAuthFlow(host: string): Promise<AuthResult> {
   if (pasteResult) {
     saveCredentials(pasteResult.token, pasteResult.username, host);
     p.log.success(`Connected as ${pc.green(`@${pasteResult.username}`)}`);
-    return { authenticated: true, username: pasteResult.username };
+    return { authenticated: true, username: pasteResult.username, token: pasteResult.token, host };
   }
   return { authenticated: false };
 }
 
-async function multiProfileFlow(parsed: CredentialsFile, host: string): Promise<AuthResult> {
+async function multiProfileFlow(
+  parsed: CredentialsFile,
+  host: string,
+  fastPath?: boolean,
+): Promise<AuthResult> {
   const s = p.spinner();
   s.start('Checking accounts...');
   const profiles = await validateAllProfiles(parsed, host);
   s.stop(`Found ${profiles.length} account${profiles.length === 1 ? '' : 's'}`);
 
+  // Fast path with expired active — just show selector, don't auto-skip
   const result = await showProfileSelector(profiles);
   if (!result) {
     return { authenticated: false, skipped: true };
@@ -146,7 +203,7 @@ async function multiProfileFlow(parsed: CredentialsFile, host: string): Promise<
 
   const { profile } = result;
 
-  if (!profile.username) {
+  if (profile.validation.status === 'expired') {
     p.log.warn(`Token for @${profile.name} has expired`);
     return freshAuthFlow(profile.host);
   }
@@ -155,8 +212,11 @@ async function multiProfileFlow(parsed: CredentialsFile, host: string): Promise<
     updateActiveProfile(profile.name);
   }
 
-  p.log.success(`Using ${pc.green(`@${profile.username}`)}`);
-  return { authenticated: true, username: profile.username };
+  const username =
+    profile.validation.status === 'valid' ? profile.validation.username : profile.name;
+
+  p.log.success(`Using ${pc.green(`@${username}`)}`);
+  return { authenticated: true, username, token: profile.token, host: profile.host };
 }
 
 // ─── Profile helpers ────────────────────────────────────────────────
@@ -164,21 +224,24 @@ async function multiProfileFlow(parsed: CredentialsFile, host: string): Promise<
 function readCredentialsFile(): CredentialsFile | null {
   const raw = readTextFile(CREDENTIALS_PATH);
   if (!raw) return null;
-  return parseCredentialsYaml(raw);
+  const parsed = parseCredentialsYaml(raw);
+  if (!parsed) return null;
+  // Migrate old profile keys if needed
+  return migrateCredentials(parsed);
 }
 
 async function validateAllProfiles(
   parsed: CredentialsFile,
   defaultHost: string,
 ): Promise<ValidatedProfile[]> {
-  const activeName = parsed.active || 'default';
+  const activeName = parsed.active || Object.keys(parsed.profiles)[0];
   const entries = Object.entries(parsed.profiles).filter(([, prof]) => prof.token);
 
   const validated = await Promise.all(
     entries.map(async ([name, profile]) => {
       const host = profile.host || defaultHost;
-      const username = await validateToken(profile.token, host);
-      return { name, token: profile.token, host, username, isActive: name === activeName };
+      const validation = await validateToken(profile.token, host);
+      return { name, token: profile.token, host, validation, isActive: name === activeName };
     }),
   );
 
@@ -198,13 +261,20 @@ async function showProfileSelector(
   const choice = await p.select({
     message: 'Which account to use?',
     options: [
-      ...profiles.map((profile) => ({
-        value: profile.name,
-        label: `@${profile.username || profile.name}`,
-        hint: [profile.isActive ? 'active' : '', !profile.username ? 'token expired' : '']
-          .filter(Boolean)
-          .join(', ') || undefined,
-      })),
+      ...profiles.map((profile) => {
+        const displayName =
+          profile.validation.status === 'valid' ? profile.validation.username : profile.name;
+        const hints: string[] = [];
+        if (profile.isActive) hints.push('active');
+        if (profile.validation.status === 'expired') hints.push('token expired');
+        if (profile.validation.status === 'network_error') hints.push('offline?');
+
+        return {
+          value: profile.name,
+          label: `@${displayName}`,
+          hint: hints.join(', ') || undefined,
+        };
+      }),
       { value: NEW_ACCOUNT, label: '+ Connect a new account' },
     ],
     initialValue: activeProfile?.name,
@@ -245,8 +315,8 @@ export function readExistingCredentials(): Credentials | null {
   const parsed = parseCredentialsYaml(raw);
   if (!parsed) return null;
 
-  const activeProfile = parsed.active || 'default';
-  const profile = parsed.profiles[activeProfile];
+  const activeProfile = parsed.active || Object.keys(parsed.profiles)[0];
+  const profile = activeProfile ? parsed.profiles[activeProfile] : undefined;
   if (!profile?.token) return null;
 
   return {
@@ -256,19 +326,26 @@ export function readExistingCredentials(): Credentials | null {
   };
 }
 
-// ─── Token validation ───────────────────────────────────────────────
+// ─── Token validation (tri-state) ───────────────────────────────────
 
-export async function validateToken(token: string, host: string): Promise<string | null> {
+export async function validateToken(token: string, host: string): Promise<TokenValidation> {
   try {
     const res = await fetch(`${host}/api/v1/site`, {
       headers: { Authorization: `Bearer ${token}` },
       signal: AbortSignal.timeout(5000),
     });
-    if (!res.ok) return null;
-    const data = (await res.json()) as { username?: string };
-    return data.username || null;
-  } catch {
-    return null;
+    if (res.ok) {
+      const data = (await res.json()) as { username?: string };
+      if (data.username) return { status: 'valid', username: data.username };
+      return { status: 'expired' };
+    }
+    if (res.status === 401 || res.status === 403) {
+      return { status: 'expired' };
+    }
+    // 5xx or other server errors → treat as network error
+    return { status: 'network_error', error: `HTTP ${res.status}` };
+  } catch (err) {
+    return { status: 'network_error', error: err instanceof Error ? err.message : undefined };
   }
 }
 
@@ -328,10 +405,10 @@ async function deviceFlowAuth(host: string): Promise<{ token: string; username: 
 
       if (res.ok) {
         const data = (await res.json()) as { access_token: string };
-        const username = await validateToken(data.access_token, host);
-        if (username) {
-          s.stop(`Authorized as ${pc.green(`@${username}`)}`);
-          return { token: data.access_token, username };
+        const v = await validateToken(data.access_token, host);
+        if (v.status === 'valid') {
+          s.stop(`Authorized as ${pc.green(`@${v.username}`)}`);
+          return { token: data.access_token, username: v.username };
         }
         s.stop('Authorization failed');
         return null;
@@ -371,13 +448,28 @@ async function pasteTokenAuth(host: string): Promise<{ token: string; username: 
   }
 
   const trimmed = (token as string).trim();
-  const username = await validateToken(trimmed, host);
-  if (!username) {
+  const v = await validateToken(trimmed, host);
+  if (v.status !== 'valid') {
     p.log.error('Could not verify token');
     return null;
   }
 
-  return { token: trimmed, username };
+  return { token: trimmed, username: v.username };
+}
+
+// ─── Profile key helpers ────────────────────────────────────────────
+
+function profileKey(username: string, host: string): string {
+  if (!host || host === DEFAULT_HOST) return username;
+  // Extract domain from URL: "https://example.com" → "example.com"
+  const domain = host.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  return `${username}@${domain}`;
+}
+
+function migrateCredentials(creds: CredentialsFile): CredentialsFile {
+  // No migration needed — the format is already using simple keys
+  // Future migrations can be added here
+  return creds;
 }
 
 // ─── Credential persistence ─────────────────────────────────────────
@@ -386,18 +478,21 @@ function saveCredentials(token: string, username: string, host: string): void {
   const raw = readTextFile(CREDENTIALS_PATH);
   const creds = (raw ? parseCredentialsYaml(raw) : null) || { profiles: {} };
 
-  // Upsert profile by username
-  creds.profiles[username] = {
+  const key = profileKey(username, host);
+
+  // Upsert profile, preserving extra fields (nickname, site_url, etc.)
+  creds.profiles[key] = {
+    ...creds.profiles[key],
     token,
     ...(host !== DEFAULT_HOST ? { host } : {}),
   };
-  creds.active = username;
+  creds.active = key;
 
   ensureDir(dirname(CREDENTIALS_PATH));
   writeFileSync(CREDENTIALS_PATH, serializeCredentialsYaml(creds), { mode: 0o600 });
 }
 
-// ─── YAML parsing (duplicated from mcp/src/config.ts) ───────────────
+// ─── YAML parsing ───────────────────────────────────────────────────
 
 function parseCredentialsYaml(content: string): CredentialsFile | null {
   const lines = content.split('\n');
@@ -417,8 +512,8 @@ function parseCredentialsYaml(content: string): CredentialsFile | null {
       continue;
     }
 
-    // Profile name: "  personal:" (2-space indent, no value)
-    const profileMatch = trimmed.match(/^  (\w[\w-]*):\s*$/);
+    // Profile name: "  personal:" or "  user@host.com:" (2-space indent, no value)
+    const profileMatch = trimmed.match(/^  ([\w][\w@.\-]*):\s*$/);
     if (profileMatch) {
       currentProfile = profileMatch[1];
       result.profiles[currentProfile] = { token: '' };
@@ -426,19 +521,15 @@ function parseCredentialsYaml(content: string): CredentialsFile | null {
     }
 
     // Profile field: "    token: til_abc..." (4-space indent)
-    const fieldMatch = trimmed.match(/^    (\w+):\s*(.+)$/);
+    const fieldMatch = trimmed.match(/^    ([\w_]+):\s*(.+)$/);
     if (fieldMatch && currentProfile && result.profiles[currentProfile]) {
       const [, key, value] = fieldMatch;
       (result.profiles[currentProfile] as Record<string, string>)[key] = value.trim();
     }
   }
 
-  // Backward compat: plain token file (no YAML structure)
+  // No valid structure found
   if (!result.active && Object.keys(result.profiles).length === 0) {
-    const token = content.trim();
-    if (token.startsWith('til_')) {
-      return { active: 'default', profiles: { default: { token } } };
-    }
     return null;
   }
 
@@ -455,9 +546,10 @@ function serializeCredentialsYaml(creds: CredentialsFile): string {
   lines.push('profiles:');
   for (const [name, profile] of Object.entries(creds.profiles)) {
     lines.push(`  ${name}:`);
-    lines.push(`    token: ${profile.token}`);
-    if (profile.host) {
-      lines.push(`    host: ${profile.host}`);
+    for (const [key, value] of Object.entries(profile)) {
+      if (value) {
+        lines.push(`    ${key}: ${value}`);
+      }
     }
   }
 
