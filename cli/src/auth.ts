@@ -38,6 +38,14 @@ interface DeviceCodeResponse {
   interval: number;
 }
 
+interface ValidatedProfile {
+  name: string;
+  token: string;
+  host: string;
+  username: string | null; // null = expired/invalid
+  isActive: boolean;
+}
+
 // ─── Main entry point ───────────────────────────────────────────────
 
 export async function runAuthPhase(): Promise<AuthResult> {
@@ -47,23 +55,40 @@ export async function runAuthPhase(): Promise<AuthResult> {
 
   const host = process.env.OPENTIL_HOST || DEFAULT_HOST;
 
-  // Check existing credentials
-  const existing = readExistingCredentials();
-  if (existing) {
-    const username = await validateToken(existing.token, existing.host);
+  // Environment variable takes precedence — skip selector
+  const envToken = process.env.OPENTIL_TOKEN;
+  if (envToken) {
+    const username = await validateToken(envToken, host);
     if (username) {
       p.log.success(`Already connected as ${pc.green(`@${username}`)}`);
       return { authenticated: true, username };
     }
-    if (existing.source === 'env') {
-      p.log.warn(`OPENTIL_TOKEN is set but invalid — unset it to re-authenticate`);
-      return { authenticated: false, skipped: true };
-    }
-    // File token is invalid — fall through to auth flow
-    p.log.warn('Saved token is no longer valid');
+    p.log.warn('OPENTIL_TOKEN is set but invalid — unset it to re-authenticate');
+    return { authenticated: false, skipped: true };
   }
 
-  // Auth method selection
+  // Read credentials file
+  const parsed = readCredentialsFile();
+  if (!parsed) {
+    return freshAuthFlow(host);
+  }
+
+  const profileCount = Object.values(parsed.profiles).filter((prof) => prof.token).length;
+
+  if (profileCount === 0) {
+    return freshAuthFlow(host);
+  }
+
+  if (profileCount === 1) {
+    return singleProfileFlow(parsed, host);
+  }
+
+  return multiProfileFlow(parsed, host);
+}
+
+// ─── Profile flows ──────────────────────────────────────────────────
+
+async function freshAuthFlow(host: string): Promise<AuthResult> {
   const method = await p.select({
     message: 'Connect your OpenTIL account?',
     options: [
@@ -106,6 +131,118 @@ export async function runAuthPhase(): Promise<AuthResult> {
     return { authenticated: true, username: pasteResult.username };
   }
   return { authenticated: false };
+}
+
+async function singleProfileFlow(parsed: CredentialsFile, host: string): Promise<AuthResult> {
+  const activeName = parsed.active || 'default';
+  const profile = parsed.profiles[activeName] || Object.values(parsed.profiles)[0];
+  if (!profile?.token) return freshAuthFlow(host);
+
+  const profileHost = profile.host || host;
+  const username = await validateToken(profile.token, profileHost);
+  if (username) {
+    p.log.success(`Already connected as ${pc.green(`@${username}`)}`);
+    return { authenticated: true, username };
+  }
+
+  p.log.warn('Saved token is no longer valid');
+  return freshAuthFlow(host);
+}
+
+async function multiProfileFlow(parsed: CredentialsFile, host: string): Promise<AuthResult> {
+  const s = p.spinner();
+  s.start('Checking accounts...');
+  const profiles = await validateAllProfiles(parsed, host);
+  s.stop(`Found ${profiles.length} account${profiles.length === 1 ? '' : 's'}`);
+
+  const result = await showProfileSelector(profiles);
+  if (!result) {
+    return { authenticated: false, skipped: true };
+  }
+
+  if (result.action === 'new') {
+    return freshAuthFlow(host);
+  }
+
+  const { profile } = result;
+
+  if (!profile.username) {
+    p.log.warn(`Token for @${profile.name} has expired`);
+    return freshAuthFlow(profile.host);
+  }
+
+  if (!profile.isActive) {
+    updateActiveProfile(profile.name);
+  }
+
+  p.log.success(`Using ${pc.green(`@${profile.username}`)}`);
+  return { authenticated: true, username: profile.username };
+}
+
+// ─── Profile helpers ────────────────────────────────────────────────
+
+function readCredentialsFile(): CredentialsFile | null {
+  const raw = readTextFile(CREDENTIALS_PATH);
+  if (!raw) return null;
+  return parseCredentialsYaml(raw);
+}
+
+async function validateAllProfiles(
+  parsed: CredentialsFile,
+  defaultHost: string,
+): Promise<ValidatedProfile[]> {
+  const activeName = parsed.active || 'default';
+  const entries = Object.entries(parsed.profiles).filter(([, prof]) => prof.token);
+
+  const validated = await Promise.all(
+    entries.map(async ([name, profile]) => {
+      const host = profile.host || defaultHost;
+      const username = await validateToken(profile.token, host);
+      return { name, token: profile.token, host, username, isActive: name === activeName };
+    }),
+  );
+
+  // Sort: active first, then alphabetical
+  return validated.sort((a, b) => {
+    if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+async function showProfileSelector(
+  profiles: ValidatedProfile[],
+): Promise<{ action: 'use'; profile: ValidatedProfile } | { action: 'new' } | null> {
+  const NEW_ACCOUNT = '__new__';
+  const activeProfile = profiles.find((prof) => prof.isActive);
+
+  const choice = await p.select({
+    message: 'Which account to use?',
+    options: [
+      ...profiles.map((profile) => ({
+        value: profile.name,
+        label: `@${profile.username || profile.name}`,
+        hint: [profile.isActive ? 'active' : '', !profile.username ? 'token expired' : '']
+          .filter(Boolean)
+          .join(', ') || undefined,
+      })),
+      { value: NEW_ACCOUNT, label: '+ Connect a new account' },
+    ],
+    initialValue: activeProfile?.name,
+  });
+
+  if (p.isCancel(choice)) return null;
+  if (choice === NEW_ACCOUNT) return { action: 'new' };
+  const selected = profiles.find((prof) => prof.name === choice)!;
+  return { action: 'use', profile: selected };
+}
+
+function updateActiveProfile(name: string): void {
+  const raw = readTextFile(CREDENTIALS_PATH);
+  if (!raw) return;
+  const creds = parseCredentialsYaml(raw);
+  if (!creds) return;
+  creds.active = name;
+  writeFileSync(CREDENTIALS_PATH, serializeCredentialsYaml(creds), { mode: 0o600 });
 }
 
 // ─── Credential reading ─────────────────────────────────────────────
