@@ -358,7 +358,7 @@ async function deviceFlowAuth(host: string): Promise<{ token: string; username: 
     const res = await fetch(`${host}/api/v1/oauth/device/code`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ scopes: ['read', 'write'] }),
+      body: JSON.stringify({ scopes: ['read', 'write', 'delete'] }),
       signal: AbortSignal.timeout(10000),
     });
     if (!res.ok) {
