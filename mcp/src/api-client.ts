@@ -1,5 +1,9 @@
 import { ApiError } from './errors.js';
 import type { Config } from './config.js';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const { version: PKG_VERSION } = require('../package.json');
 
 const TIMEOUT_MS = 15_000;
 
@@ -50,6 +54,7 @@ export class ApiClient {
       Accept: 'application/json',
       'X-OpenTIL-Source': 'agent',
       'X-OpenTIL-Agent': 'MCP Server (stdio)',
+      'X-OpenTIL-Client': `@opentil/mcp/${PKG_VERSION}`,
     };
   }
 

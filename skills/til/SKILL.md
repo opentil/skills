@@ -393,26 +393,26 @@ Three layers of attribution signal distinguish human-initiated from agent-initia
 Include these headers on every API call:
 
 ```
-X-OpenTIL-Source: human | agent
+X-OpenTIL-Source: agent
 X-OpenTIL-Agent: <your agent display name>
 X-OpenTIL-Model: <human-readable model name>
+X-OpenTIL-Client: til-skill/<version from metadata>
 ```
 
-- Source: `/til <content>` and `/til` -> `human`; Auto-detected -> `agent`
+- Source: always `agent` — the agent authors the content regardless of trigger method
 - Agent: use your tool's display name (e.g. `Claude Code`, `Cursor`, `GitHub Copilot`). Do not use a slug.
 - Model: use a human-readable model name (e.g. `Claude Opus 4.6`, `GPT-4o`, `Gemini 2.5 Pro`). Do not use a model ID.
-- Agent and Model are optional -- omit them if you are unsure.
+- Client: use the format `til-skill/{version}` where version comes from this file's frontmatter metadata (currently `1.26.0`).
+- Agent and Model are optional -- omit them if you are unsure. Client is required.
 
 ### Layer 2: Tag Convention
 
-- Auto-detected TILs: automatically add `agent-assisted` to the tag list
-- `/til <content>` and `/til`: do **not** add the tag (unless the agent generated >80% of the final content from a minimal seed — e.g. user gave a few words and agent produced a full entry)
+- Do **not** add an `agent-assisted` tag — the `source` field already provides attribution via the backend display layer
 
 ### Layer 3: Attribution Rendering (Backend)
 
-Agent-initiated TILs are visually marked on OpenTIL automatically based on the
-`source` field. No content modification needed -- the backend renders attribution
-in the display layer.
+TILs with `source: agent` are visually marked on OpenTIL automatically.
+No content modification needed -- the backend renders attribution in the display layer.
 
 - Public page: shows `✨ via {agent_name}`, or `✨ AI` when agent_name is absent
 - Tooltip (hover): shows `{agent_name} · {model}` when both are present
@@ -426,10 +426,10 @@ Do NOT append any footer or attribution text to the content body.
 |-----------|-----------------|--------|---------------|
 | Trigger | User explicit | User command | Agent proactive |
 | Confirmations | 0 (direct publish) | 1 (review before publish) | 1 (suggest → capture) |
-| Source header | `human` | `human` | `agent` |
+| Source header | `agent` | `agent` | `agent` |
 | Agent header | Yes | Yes | Yes |
 | Model header | Yes | Yes | Yes |
-| `agent-assisted` tag | No | No | Yes |
+| Client header | Yes | Yes | Yes |
 | Attribution | Automatic (backend) | Automatic (backend) | Automatic (backend) |
 
 ## Content Guidelines
