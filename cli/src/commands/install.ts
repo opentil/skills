@@ -13,6 +13,7 @@ import { join } from 'node:path';
 import { getVersion, checkLatestVersion } from '../version.js';
 import { runAuthPhase } from '../auth.js';
 import { showLogo } from '../logo.js';
+import { isJsonMode, jsonOutput, jsonError, type ParsedFlags } from '../json-mode.js';
 
 const EXTRA_LABELS: Record<ExtraType, string> = {
   hooks: 'Hooks (auto-detection reminders)',
@@ -40,9 +41,176 @@ export function shouldUseFastPath(
   return noNewAgents;
 }
 
-// ─── Main install flow ──────────────────────────────────────────────
+// ─── Main entry point ───────────────────────────────────────────────
 
-export async function install(): Promise<void> {
+export async function install(flags: ParsedFlags): Promise<void> {
+  if (isJsonMode()) {
+    return headlessInstall(flags);
+  }
+  return interactiveInstall();
+}
+
+// ─── Headless install (--json mode) ─────────────────────────────────
+
+async function headlessInstall(flags: ParsedFlags): Promise<void> {
+  const version = getVersion();
+
+  // --agent is required in headless mode
+  if (!flags.agent) {
+    jsonError('--agent is required in --json mode', 'MISSING_AGENT', {
+      available: Object.keys(agents),
+    });
+  }
+
+  // Clean up installer-created dirs
+  cleanupInstallerDirs();
+
+  // Resolve agent(s)
+  const detected = detectAgents();
+  const installedAgents = detected.filter((a) => a.installed);
+  let selectedAgentIds: string[];
+
+  if (flags.agent === 'all') {
+    if (installedAgents.length === 0) {
+      jsonError('No supported AI agents detected', 'NO_AGENTS');
+    }
+    selectedAgentIds = installedAgents.map((a) => a.id);
+  } else if (flags.agent === 'auto') {
+    if (installedAgents.length === 0) {
+      jsonError('No supported AI agents detected', 'NO_AGENTS');
+    }
+    selectedAgentIds = installedAgents.map((a) => a.id);
+  } else {
+    // Specific agent name
+    const config = agents[flags.agent];
+    if (!config) {
+      jsonError(`Unknown agent: ${flags.agent}`, 'UNKNOWN_AGENT', {
+        available: Object.keys(agents),
+      });
+    }
+    selectedAgentIds = [flags.agent];
+  }
+
+  // Parse --extras (comma-separated) or default to agent's supported extras
+  const agentExtras: Record<string, ExtraType[]> = {};
+  for (const agentId of selectedAgentIds) {
+    const config = agents[agentId];
+    if (flags.extras !== undefined) {
+      const requested = flags.extras.split(',').map((s) => s.trim()).filter(Boolean) as ExtraType[];
+      // Validate each extra against agent's supported extras
+      const invalid = requested.filter((e) => !config.extras.includes(e));
+      if (invalid.length > 0) {
+        jsonError(`Invalid extras for ${agentId}: ${invalid.join(', ')}`, 'INVALID_EXTRAS', {
+          invalid,
+          available: config.extras,
+        });
+      }
+      agentExtras[agentId] = requested;
+    } else {
+      // Default: install all extras the agent supports
+      agentExtras[agentId] = [...config.extras];
+    }
+  }
+
+  // Handle authentication
+  let authStatus: 'authenticated' | 'skipped' | 'token_provided' = 'skipped';
+  let authToken: string | undefined;
+  let authUsername: string | undefined;
+
+  if (flags.token) {
+    // Direct token provided
+    authToken = flags.token;
+    authStatus = 'token_provided';
+  } else if (!flags.skipAuth) {
+    // Try to use existing credentials (non-interactive)
+    const { readExistingCredentials, validateToken } = await import('../auth.js');
+    const creds = readExistingCredentials();
+    if (creds) {
+      authToken = creds.token;
+      const v = await validateToken(creds.token, creds.host);
+      if (v.status === 'valid') {
+        authUsername = v.username;
+        authStatus = 'authenticated';
+      }
+    }
+  }
+
+  // Execute installation
+  const existingManifest = readManifest();
+  const manifest: Manifest = existingManifest
+    ? updateManifest(existingManifest, version)
+    : createManifest(version);
+
+  // Preserve existing agent entries not involved in this install
+  const preservedAgents = { ...manifest.agents };
+  for (const agentId of selectedAgentIds) {
+    delete preservedAgents[agentId];
+  }
+  manifest.agents = { ...preservedAgents };
+
+  const installedExtras: Record<string, ExtraType[]> = {};
+
+  for (const agentId of selectedAgentIds) {
+    const config = agents[agentId];
+    const extras = agentExtras[agentId];
+
+    // Copy SKILL.md + references
+    const skillDir = join(config.globalSkillDir, 'til');
+    installSkillFiles(skillDir, { commandPrefix: config.commandPrefix });
+
+    // Install extras
+    installAgentExtras(agentId, config, extras);
+
+    manifest.agents[agentId] = {
+      skill: true,
+      extras,
+    };
+    installedExtras[agentId] = extras;
+  }
+
+  // MCP configuration
+  const mcpResult: Record<string, { configured: boolean; configPath?: string }> = {};
+
+  for (const agentId of selectedAgentIds) {
+    const config = agents[agentId];
+    if (config.mcpConfigPath && authToken) {
+      installMcpConfig(config.mcpConfigPath, authToken);
+      manifest.agents[agentId].mcp = true;
+      mcpResult[agentId] = { configured: true, configPath: config.mcpConfigPath };
+    } else if (config.mcpConfigPath) {
+      mcpResult[agentId] = { configured: false };
+    }
+  }
+
+  // Write manifest
+  writeManifest(manifest);
+
+  // Build JSON output
+  const result: Record<string, unknown> = {
+    success: true,
+    version,
+    agents: selectedAgentIds.map((id) => ({
+      id,
+      name: agents[id].displayName,
+      skillDir: join(agents[id].globalSkillDir, 'til'),
+      extras: installedExtras[id],
+      mcp: mcpResult[id] ?? undefined,
+    })),
+    auth: {
+      status: authStatus,
+      username: authUsername,
+      hint: authStatus === 'skipped'
+        ? 'Run /til auth to connect your account'
+        : undefined,
+    },
+  };
+
+  jsonOutput(result);
+}
+
+// ─── Interactive install (original flow) ────────────────────────────
+
+async function interactiveInstall(): Promise<void> {
   const version = getVersion();
 
   showLogo();

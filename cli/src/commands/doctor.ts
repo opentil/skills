@@ -7,6 +7,7 @@ import { agents, type ExtraType } from '../agents/registry.js';
 import { home, readJsonFile, readTextFile } from '../utils.js';
 import { getVersion, checkLatestVersion } from '../version.js';
 import { validateToken, readExistingCredentials } from '../auth.js';
+import { isJsonMode, jsonOutput, type ParsedFlags } from '../json-mode.js';
 
 interface CheckResult {
   label: string;
@@ -14,7 +15,75 @@ interface CheckResult {
   detail?: string;
 }
 
-export async function doctor(): Promise<void> {
+export async function doctor(_flags: ParsedFlags): Promise<void> {
+  if (isJsonMode()) {
+    return doctorJson();
+  }
+  return doctorInteractive();
+}
+
+// ─── JSON mode ──────────────────────────────────────────────────────
+
+async function doctorJson(): Promise<void> {
+  const manifest = readManifest();
+  if (!manifest) {
+    jsonOutput({
+      installed: false,
+      version: getVersion(),
+    });
+    return; // unreachable — jsonOutput calls process.exit
+  }
+
+  const version = getVersion();
+  const versionCheck = await checkLatestVersion();
+
+  // Check agents
+  const agentResults: Record<string, Record<string, unknown>> = {};
+  for (const [agentId, agentManifest] of Object.entries(manifest.agents)) {
+    const config = agents[agentId];
+    if (!config) {
+      agentResults[agentId] = { detected: false, error: 'Unknown agent' };
+      continue;
+    }
+
+    const skillMdPath = join(config.globalSkillDir, 'til', 'SKILL.md');
+    agentResults[agentId] = {
+      detected: config.detect(),
+      skill: existsSync(skillMdPath),
+      skillVersion: manifest.version,
+      extras: agentManifest.extras,
+      mcp: agentManifest.mcp ?? false,
+    };
+  }
+
+  // Check auth
+  const creds = readExistingCredentials();
+  let authResult: Record<string, unknown> = { status: 'none' };
+
+  if (creds) {
+    const v = await validateToken(creds.token, creds.host);
+    if (v.status === 'valid') {
+      authResult = { status: 'authenticated', username: v.username, source: creds.source };
+    } else if (v.status === 'expired') {
+      authResult = { status: 'expired', source: creds.source };
+    } else {
+      authResult = { status: 'network_error', source: creds.source };
+    }
+  }
+
+  jsonOutput({
+    installed: true,
+    version,
+    latest: versionCheck?.latest ?? version,
+    outdated: versionCheck?.isOutdated ?? false,
+    agents: agentResults,
+    auth: authResult,
+  });
+}
+
+// ─── Interactive mode ───────────────────────────────────────────────
+
+async function doctorInteractive(): Promise<void> {
   p.intro(`${pc.bgCyan(pc.black(' OpenTIL '))} doctor`);
 
   const manifest = readManifest();

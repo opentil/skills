@@ -70,6 +70,7 @@ The first word after `/til` determines the action. Reserved words route to manag
 | `/til tags` | List site tags with usage counts |
 | `/til categories` | List site categories |
 | `/til batch <topics>` | Batch-capture multiple TIL entries |
+| `/til update` | Self-update skill files to latest version |
 | `/til auth` | Connect OpenTIL account (browser auth) |
 | `/til auth switch [name]` | Switch active profile (by profile name or @nickname) |
 | `/til auth list` | List all profiles |
@@ -78,7 +79,7 @@ The first word after `/til` determines the action. Reserved words route to manag
 | `/til <anything else>` | Capture content as a new TIL |
 | `/til` | Extract insights from conversation (multi-candidate) |
 
-Reserved words: `list`, `publish`, `unpublish`, `edit`, `search`, `delete`, `status`, `sync`, `tags`, `categories`, `batch`, `auth`.
+Reserved words: `list`, `publish`, `unpublish`, `edit`, `search`, `delete`, `status`, `sync`, `tags`, `categories`, `batch`, `update`, `auth`.
 
 ## Reference Loading
 
@@ -93,6 +94,7 @@ Reserved words: `list`, `publish`, `unpublish`, `edit`, `search`, `delete`, `sta
 | `/til list\|status\|tags\|categories` | [references/management.md](references/management.md) |
 | `/til publish\|unpublish\|edit\|search\|delete\|batch` | [references/management.md](references/management.md) |
 | `/til sync` | [references/management.md](references/management.md), [references/local-drafts.md](references/local-drafts.md) |
+| `/til update` | none (self-contained instructions below) |
 | `/til auth` | [references/management.md](references/management.md), [references/api.md](references/api.md) |
 | `/til auth switch\|list\|remove\|rename` | [references/management.md](references/management.md) |
 
@@ -384,6 +386,28 @@ Track the following session state (not persisted across sessions):
 
 > Detailed subcommand flows, display formats, and error handling: see references/management.md
 
+### `/til update`
+
+Self-update the TIL skill files to the latest version.
+
+**Steps:**
+1. Run: `npx @opentil/cli@latest update --agent <current-agent> --json`
+   - Replace `<current-agent>` with your agent identifier (e.g. `claude-code`, `cursor`, `codex`). If unsure, use `all`.
+2. Parse the JSON output
+3. If `updated: true` → report the version change (from → to), suggest reloading the skill
+4. If `updated: false` → "Already up to date (vX.Y.Z)"
+5. If the command fails or JSON cannot be parsed → show the error and suggest manual update
+
+**Example output:**
+```
+Skill updated: v1.26.0 → v1.28.0
+
+Reload the /til skill to use the new version.
+```
+
+**Fallback (no Node.js):**
+Re-read https://opentil.ai/connect/skill.md and follow the manual install section.
+
 ## Agent Identity
 
 Three layers of attribution signal distinguish human-initiated from agent-initiated TILs.
@@ -572,7 +596,7 @@ After the first successful API call in a conversation, check the installed skill
 1. Read `~/.til/manifest.json` and parse `updatedAt` (ISO timestamp)
 2. If `updatedAt` is more than 30 days ago, append after the success message:
    ```
-   Tip: Skill installed 45 days ago. Run npx @opentil/cli@latest to check for updates.
+   Tip: Skill installed 45 days ago. Run /til update to get the latest version.
    ```
 3. If the file doesn't exist or can't be parsed, skip silently
 4. Only check once per conversation — do not repeat on subsequent saves

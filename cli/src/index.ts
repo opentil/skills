@@ -2,20 +2,29 @@ import { install } from './commands/install.js';
 import { update } from './commands/update.js';
 import { uninstall } from './commands/uninstall.js';
 import { doctor } from './commands/doctor.js';
+import { detect } from './commands/detect.js';
+import { parseFlags, enableJsonMode } from './json-mode.js';
 
-const command = process.argv[2];
+const flags = parseFlags(process.argv);
 
-switch (command) {
+if (flags.json) {
+  enableJsonMode();
+}
+
+switch (flags.command) {
   case 'update':
-    update();
+    update(flags);
     break;
   case 'uninstall':
-    uninstall();
+    uninstall(flags);
     break;
   case 'doctor':
-    doctor();
+    doctor(flags);
+    break;
+  case 'detect':
+    detect(flags);
     break;
   default:
-    install();
+    install(flags);
     break;
 }
