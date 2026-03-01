@@ -12,6 +12,7 @@ import { getRecentLearnings } from './tools/get-recent-learnings.js';
 import { searchKnowledge } from './tools/search-knowledge.js';
 import { getEntry } from './tools/get-entry.js';
 import { createTil } from './tools/create-til.js';
+import { listCategories } from './tools/list-categories.js';
 
 function getVersion(): string {
   const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -143,8 +144,14 @@ server.tool(
       .describe('Whether to publish immediately or save as draft'),
     summary: z.string().optional().describe('Short summary / excerpt'),
     lang: z.string().optional().describe('Language code (e.g. "en", "zh")'),
+    category_name: z
+      .string()
+      .trim()
+      .min(1)
+      .optional()
+      .describe('Category name (matched or created automatically)'),
   },
-  async ({ title, content, tags, visibility, published, summary, lang }) => {
+  async ({ title, content, tags, visibility, published, summary, lang, category_name }) => {
     const api = createApi();
     if (!api) return { content: [{ type: 'text' as const, text: NO_TOKEN_MESSAGE }] };
 
@@ -156,7 +163,22 @@ server.tool(
       published,
       summary,
       lang,
+      category_name,
     });
+    return { content: [{ type: 'text' as const, text }] };
+  },
+);
+
+// 6. list_categories — Browse site categories
+server.tool(
+  'list_categories',
+  "List all categories for the user's site",
+  {},
+  async () => {
+    const api = createApi();
+    if (!api) return { content: [{ type: 'text' as const, text: NO_TOKEN_MESSAGE }] };
+
+    const text = await listCategories(api);
     return { content: [{ type: 'text' as const, text }] };
   },
 );

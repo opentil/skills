@@ -9,6 +9,7 @@ interface CreateParams {
   published?: boolean;
   summary?: string;
   lang?: string;
+  category_name?: string;
 }
 
 interface EntryResponse {
@@ -33,6 +34,7 @@ export async function createTil(
         ...(params.summary && { summary: params.summary }),
         ...(params.lang && { lang: params.lang }),
         ...(params.tags && { tag_names: params.tags }),
+        ...(params.category_name && { category_name: params.category_name }),
       },
     };
 

@@ -20,7 +20,7 @@ All fields are nested under `entry`. Additionally, `tag_names` and `category_nam
 | `title` | string | no | Entry title (max 200 chars). Auto-generates slug if omitted. |
 | `slug` | string | no | Custom URL slug. Auto-generated from title if omitted. |
 | `tag_names` | array | no | 1-3 lowercase tags, e.g. `["go", "concurrency"]` |
-| `category_name` | string | no | Category name. Only include if the user explicitly specifies one. |
+| `category_name` | string | no | Category name (matched or created automatically). |
 | `category_id` | integer | no | Category ID (alternative to `category_name`). |
 | `published` | boolean | no | `false` for draft (default), `true` to publish immediately. |
 | `published_at` | datetime | no | ISO 8601 timestamp. Only relevant when publishing. |

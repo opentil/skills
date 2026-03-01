@@ -135,6 +135,7 @@ curl -X POST "https://opentil.ai/api/v1/entries" \
 | `lang` | string | no | Language code: `en`, `zh-CN`, `zh-TW`, `ja`, `ko`, etc. |
 | `slug` | string | no | Custom URL slug. Auto-generated from title if omitted. |
 | `visibility` | string | no | `public` (default), `unlisted`, or `private` |
+| `category_name` | string | no | Category name (matched or created automatically) |
 | `summary` | string | no | AI-generated summary for listing pages (max 500 chars) |
 
 **Management endpoints:**
@@ -452,7 +453,7 @@ Every TIL entry must follow these rules:
 - **Content length**: Most entries are 10-100 lines. Shorter is fine when the insight is simple. Longer is fine for multi-example walkthroughs — let topic complexity dictate length.
 - **Tags**: 1-3 lowercase tags (if the topic warrants more, pick the 3 most specific). Use concrete technology/tool names, not meta-categories. Generic tags like `programming`, `til`, `webdev`, or `backend` describe *what TIL is* rather than *what the insight is about* — avoid them. Domain-specific tags like `cooking` or `astronomy` are fine because they name the subject area. Examples: `[go, concurrency]`, `[postgresql, indexing]`, `[css, flexbox]`, `[docker, networking]`, `[cooking, fermentation]`, `[astronomy, optics]`.
 - **Lang**: Detect from content. Chinese -> `zh-CN`, Traditional Chinese -> `zh-TW`, English -> `en`, Japanese -> `ja`, Korean -> `ko`.
-- **Category**: Do not auto-infer `category_name` -- only include it if the user explicitly specifies a category/topic.
+- **Category**: Before creating an entry, try calling `list_categories` to get existing categories. Match the content to an existing category if a good fit exists. If no existing category fits, suggest a new concise category name. Include `category_name` in the creation request. If `list_categories` fails, proceed without `category_name` -- never let a category lookup failure block entry creation.
 - **Summary**: 1-2 sentences, plain text (no markdown). Max 500 chars and must be shorter than the content body. Same language as content. Self-contained: the reader should understand the core takeaway from the summary alone. Be specific about what the reader will learn, not meta ("this article discusses..."). No first person, no meta-descriptions. Omit if the content is already very short (under ~200 chars) -- the excerpt fallback is sufficient.
 - **Anti-patterns** (avoid these):
   - *Command-only*: A single command or snippet with no explanation of when/why to use it. At minimum, explain the context or problem it solves.
