@@ -81,14 +81,16 @@ async function headlessInstall(flags: ParsedFlags): Promise<void> {
     }
     selectedAgentIds = installedAgents.map((a) => a.id);
   } else {
-    // Specific agent name
-    const config = agents[flags.agent];
-    if (!config) {
-      jsonError(`Unknown agent: ${flags.agent}`, 'UNKNOWN_AGENT', {
+    // Specific agent name(s) — supports comma-separated list
+    const requested = flags.agent.split(',').map((s) => s.trim()).filter(Boolean);
+    const unknown = requested.filter((id) => !agents[id]);
+    if (unknown.length > 0) {
+      jsonError(`Unknown agent(s): ${unknown.join(', ')}`, 'UNKNOWN_AGENT', {
+        unknown,
         available: Object.keys(agents),
       });
     }
-    selectedAgentIds = [flags.agent];
+    selectedAgentIds = [...new Set(requested)];
   }
 
   // Parse --extras (comma-separated) or default to agent's supported extras

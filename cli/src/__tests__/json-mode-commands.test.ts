@@ -359,6 +359,49 @@ describe('install --json', () => {
     }
   });
 
+  it('installs multiple agents with comma-separated --agent', async () => {
+    currentManifest = null;
+    try {
+      await install(makeFlags({ agent: 'claude-code,cursor', skipAuth: true }));
+    } catch (e) {
+      expect(e).toBeInstanceOf(JsonOutputCapture);
+      const data = (e as JsonOutputCapture).data;
+      expect(data.success).toBe(true);
+      const agents = data.agents as Array<Record<string, unknown>>;
+      expect(agents.length).toBe(2);
+      const ids = agents.map((a) => a.id);
+      expect(ids).toContain('claude-code');
+      expect(ids).toContain('cursor');
+    }
+  });
+
+  it('deduplicates comma-separated --agent values', async () => {
+    currentManifest = null;
+    try {
+      await install(makeFlags({ agent: 'claude-code,claude-code', skipAuth: true }));
+    } catch (e) {
+      expect(e).toBeInstanceOf(JsonOutputCapture);
+      const data = (e as JsonOutputCapture).data;
+      expect(data.success).toBe(true);
+      const agents = data.agents as Array<Record<string, unknown>>;
+      expect(agents.length).toBe(1);
+      expect(agents[0].id).toBe('claude-code');
+    }
+  });
+
+  it('errors with UNKNOWN_AGENT when some comma-separated agents are invalid', async () => {
+    currentManifest = null;
+    try {
+      await install(makeFlags({ agent: 'claude-code,nonexistent' }));
+      expect.unreachable('should have thrown');
+    } catch (e) {
+      expect(e).toBeInstanceOf(JsonErrorCapture);
+      const err = e as JsonErrorCapture;
+      expect(err.code).toBe('UNKNOWN_AGENT');
+      expect(err.extra?.unknown).toEqual(['nonexistent']);
+    }
+  });
+
   it('errors with UNKNOWN_AGENT for unrecognized agent name', async () => {
     currentManifest = null;
     try {
