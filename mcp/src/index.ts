@@ -41,16 +41,25 @@ function createApi(): ApiClient | null {
   return new ApiClient(config);
 }
 
-const server = new McpServer({
-  name: 'opentil',
-  version: getVersion(),
-});
+const server = new McpServer(
+  { name: 'opentil', version: getVersion() },
+  {
+    instructions: [
+      'OpenTIL is your personal TIL (Today I Learned) knowledge base.',
+      '',
+      'For WRITING (create, update, delete): Prefer the TIL skill command when available — it provides content enrichment (auto-generates titles, tags, summaries), user confirmation before publishing, and local fallback on failure. Use write tools only when the TIL skill is not available.',
+      '',
+      'For READING & SEARCHING: Use get_profile, get_recent_learnings, search_knowledge, get_entry, and list_categories freely.',
+    ].join('\n'),
+  },
+);
 
 // 1. get_profile — Understand the user's technical background
 server.tool(
   'get_profile',
   "Get the user's OpenTIL profile: username, top tags, total entries, and site info",
   {},
+  { readOnlyHint: true },
   async () => {
     const api = createApi();
     if (!api) return { content: [{ type: 'text' as const, text: NO_TOKEN_MESSAGE }] };
@@ -72,6 +81,7 @@ server.tool(
       .default(10)
       .describe('Number of recent entries to fetch (1-20)'),
   },
+  { readOnlyHint: true },
   async ({ limit }) => {
     const api = createApi();
     if (!api) return { content: [{ type: 'text' as const, text: NO_TOKEN_MESSAGE }] };
@@ -98,6 +108,7 @@ server.tool(
       .default(5)
       .describe('Max results to return (1-20)'),
   },
+  { readOnlyHint: true },
   async ({ query, tag, limit }) => {
     const api = createApi();
     if (!api) return { content: [{ type: 'text' as const, text: NO_TOKEN_MESSAGE }] };
@@ -114,6 +125,7 @@ server.tool(
   {
     id: z.string().min(1).describe('Entry ID'),
   },
+  { readOnlyHint: true },
   async ({ id }) => {
     const api = createApi();
     if (!api) return { content: [{ type: 'text' as const, text: NO_TOKEN_MESSAGE }] };
@@ -126,7 +138,7 @@ server.tool(
 // 5. create_til — Record a new learning
 server.tool(
   'create_til',
-  'Create a new TIL entry to record something the user learned',
+  'Create a new TIL entry. NOTE: Prefer the TIL skill command when available — it provides richer content enrichment and user confirmation. Use this tool only as a fallback when the TIL skill is not installed.',
   {
     title: z.string().describe('Entry title'),
     content: z.string().describe('Entry content in Markdown'),
@@ -151,6 +163,7 @@ server.tool(
       .optional()
       .describe('Category name (matched or created automatically)'),
   },
+  { destructiveHint: false, readOnlyHint: false, idempotentHint: false },
   async ({ title, content, tags, visibility, published, summary, lang, category_name }) => {
     const api = createApi();
     if (!api) return { content: [{ type: 'text' as const, text: NO_TOKEN_MESSAGE }] };
@@ -174,6 +187,7 @@ server.tool(
   'list_categories',
   "List all categories for the user's site",
   {},
+  { readOnlyHint: true },
   async () => {
     const api = createApi();
     if (!api) return { content: [{ type: 'text' as const, text: NO_TOKEN_MESSAGE }] };
