@@ -191,11 +191,12 @@ The user's input is **raw material** -- a seed, not the final entry. Generate a 
 
 1. Treat the user's input as a seed -- craft a complete title + body from it
 2. Generate a concise title (3-15 words) in the same language as the content
-3. Write a self-contained Markdown body (see Content Guidelines below)
-4. Generate a summary (see Summary Guidelines below)
-5. Infer 1-3 lowercase tags (e.g. `rails`, `postgresql`, `go`, `css`)
-6. Detect language -> set `lang` (`en`, `zh-CN`, `zh-TW`, `ja`, `ko`, `es`, `fr`, `de`, `pt-BR`, `pt`, `ru`, `ar`, `bs`, `da`, `nb`, `pl`, `th`, `tr`, `it`)
-7. Follow Execution Flow above (check token -> POST or save locally)
+3. Generate an English slug (see Slug Guidelines below)
+4. Write a self-contained Markdown body (see Content Guidelines below)
+5. Generate a summary (see Summary Guidelines below)
+6. Infer 1-3 lowercase tags (e.g. `rails`, `postgresql`, `go`, `css`)
+7. Detect language -> set `lang` (`en`, `zh-CN`, `zh-TW`, `ja`, `ko`, `es`, `fr`, `de`, `pt-BR`, `pt`, `ru`, `ar`, `bs`, `da`, `nb`, `pl`, `th`, `tr`, `it`)
+8. Follow Execution Flow above (check token -> POST or save locally)
 
 No confirmation needed -- the user explicitly asked to capture. Execute directly.
 
@@ -474,6 +475,16 @@ Every TIL entry must follow these rules:
 - **One insight per entry**: Each TIL teaches exactly ONE thing. If there are multiple insights, create separate entries.
 - **Concrete examples**: Include code snippets, commands, or specific data whenever relevant. Avoid vague descriptions. Show expected output inline using comment syntax (`# => true`, `//=> [1, 2, 3]`) to make examples self-verifying and scannable.
 - **Title**: 3-15 words. Descriptive, same language as content. No "TIL:" prefix.
+- **Slug**: Always generate an English ASCII slug and include it in the API request. The server auto-generates slugs from titles, but it cannot translate — non-English titles produce meaningless fragments (e.g. "跟 AI 结对一整天" → `ai`). The agent must provide a meaningful English slug.
+  - Translate the title's core meaning into a concise English slug (3-8 words, lowercase, hyphenated)
+  - Use concrete nouns and verbs, not filler words (omit "the", "a", "how-to", etc.)
+  - Examples:
+    - "跟 AI 结对一整天，关掉终端什么都没留下？" → `ai-pair-programming-nothing-left`
+    - "30 秒装好，3 种方式记 TIL" → `3-ways-to-capture-til`
+    - "二分查找的时间复杂度推导与决策流程" → `binary-search-time-complexity`
+    - "Docker 多阶段构建能把镜像体积缩小十几倍" → `docker-multi-stage-build-image-size`
+    - "Rails ETag caching keys" → `rails-etag-caching-keys` (English title — slug matches naturally)
+  - If the title is already in English, `parameterize` produces a good slug — you may still omit it and let the server handle it
 - **Preferred structure** (flexible, not mandatory):
   1. 1-2 sentence context or problem statement
   2. Core insight or explanation
