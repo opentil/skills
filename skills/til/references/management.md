@@ -529,7 +529,7 @@ Opening browser to connect...
 
 If browser didn't open, visit:
   https://opentil.ai/device
-Enter code: XXXX-YYYY
+Authorization code: XXXX-YYYY
 
 Waiting for authorization...
 ```
@@ -599,7 +599,7 @@ Unable to reach OpenTIL. Check your connection and try again.
 | Already has valid token | Confirm before re-authorizing |
 | Token expired/invalid | Proceed directly to new authorization, no confirmation |
 | `~/.til/` directory doesn't exist | Create automatically |
-| Browser didn't open | Display fallback URL + manual code entry |
+| Browser didn't open | Display fallback URL + authorization code for manual entry |
 | User cancels in browser | Polling times out, show timeout message |
 | Token obtained + local drafts exist | Offer to sync |
 | Old plain-text credentials file | Migrate to YAML `default` profile before proceeding |

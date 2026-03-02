@@ -8,6 +8,8 @@ metadata: {"author":"opentil","version":"1.29.0","primaryEnv":"OPENTIL_TOKEN","o
 
 # til
 
+**Language**: Always respond in the user's language. All examples below are in English; adapt at runtime.
+
 Capture and manage "Today I Learned" entries on OpenTIL -- from drafting to publishing, all within the CLI.
 
 ## Setup
@@ -23,10 +25,15 @@ export OPENTIL_TOKEN="til_xxx"
 ### Token Resolution
 
 Token resolution order:
-1. `$OPENTIL_TOKEN` environment variable (overrides all profiles)
-2. `~/.til/credentials` file — active profile's token (created by `/til auth`)
+1. `~/.til/credentials` file — active profile's token (created by `/til auth`) ← recommended
+2. `$OPENTIL_TOKEN` environment variable — for CI/automation; overrides credentials when set
 
 If neither is set, entries are saved locally to `~/.til/drafts/`.
+
+> **Tip:** Prefer `/til auth` for interactive use. When `$OPENTIL_TOKEN` is set,
+> the agent cannot auto-reconnect on token expiry — it cannot unset or modify
+> environment variables at runtime. Use the env var only for CI/automation
+> where tokens are managed externally.
 
 ### Credential File Format
 
