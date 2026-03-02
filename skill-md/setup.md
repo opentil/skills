@@ -3,6 +3,8 @@
 
 Connect your AI agent to [OpenTIL](https://opentil.ai) — capture what you learn, automatically.
 
+**Language**: Always respond in the user's language. All instructions below are in English; adapt at runtime.
+
 ## Quick Setup
 
 ### For AI Agents (Headless Install)
@@ -41,6 +43,10 @@ The `--agent` value must be one of the IDs listed above. Use `--agent auto` to a
 npx @opentil/cli@latest detect --json
 ```
 
+> **Note:** After installation, restart your agent to load the new skill.
+> For CLI-based agents (Claude Code, Codex, Gemini CLI), exit and relaunch.
+> For IDE-based agents (Cursor, Windsurf, Cline, Roo, etc.), reload the window.
+
 ### Authentication
 
 After installation, authenticate from within your agent:
@@ -72,6 +78,12 @@ The interactive installer will guide you through agent detection, authentication
    - **agent-md** — TIL section in your agent's instructions file
 
 ## Updating
+
+The current skill version is embedded in this file (see the version comment at the top).
+
+To check if an agent's installed skill is up to date, compare the local SKILL.md
+version (in its YAML frontmatter `metadata.version`) with this file's version.
+If the local version is lower, update with:
 
 From within your agent:
 

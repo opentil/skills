@@ -8,7 +8,7 @@ metadata: {"author":"opentil","version":"1.30.0","primaryEnv":"OPENTIL_TOKEN","o
 
 # til
 
-**Language**: Always respond in the user's language. All examples below are in English; adapt at runtime.
+**Language**: Always respond in the user's language. All instructions below are in English; adapt at runtime.
 
 Capture and manage "Today I Learned" entries on OpenTIL -- from drafting to publishing, all within the CLI.
 
