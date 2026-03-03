@@ -133,6 +133,36 @@ curl -X POST "https://opentil.ai/api/v1/entries" \
   }'
 ```
 
+> **Safe API call pattern** — For POST/PATCH requests with content bodies, ALWAYS use a temp file to avoid JSON encoding issues from shell line-wrapping:
+>
+> ```bash
+> # 1. Write payload to temp file (JSON.stringify handles all escaping)
+> node -e "
+> const fs = require('fs');
+> const payload = {entry: {
+>   title: 'Go interfaces are satisfied implicitly',
+>   content: \`In Go, a type implements an interface...
+>
+> Multi-line content with \\\`code blocks\\\` is safe here.\`,
+>   tag_names: ['go', 'interfaces'],
+>   published: true,
+>   lang: 'en'
+> }};
+> fs.writeFileSync('/tmp/til-payload.json', JSON.stringify(payload));
+> "
+>
+> # 2. Send with curl
+> curl -s -X POST "https://opentil.ai/api/v1/entries" \
+>   -H "Authorization: Bearer $OPENTIL_TOKEN" \
+>   -H "Content-Type: application/json" \
+>   -d @/tmp/til-payload.json
+>
+> # 3. Cleanup
+> rm -f /tmp/til-payload.json
+> ```
+>
+> **Never** use inline `-d '{...}'` for content longer than a few words. **Never** use Python `urllib` — use curl.
+
 **Key create parameters:**
 
 | Field | Type | Required | Description |
