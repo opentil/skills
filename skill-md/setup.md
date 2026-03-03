@@ -1,5 +1,5 @@
 # OpenTIL Setup Guide
-<!-- opentil-skill-md version="1.33.0" -->
+<!-- opentil-skill-md version="1.34.0" -->
 
 Connect your AI agent to [OpenTIL](https://opentil.ai) — capture what you learn, automatically.
 
