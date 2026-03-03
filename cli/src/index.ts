@@ -3,6 +3,7 @@ import { update } from './commands/update.js';
 import { uninstall } from './commands/uninstall.js';
 import { doctor } from './commands/doctor.js';
 import { detect } from './commands/detect.js';
+import { image } from './commands/image.js';
 import { parseFlags, enableJsonMode } from './json-mode.js';
 
 const flags = parseFlags(process.argv);
@@ -23,6 +24,9 @@ switch (flags.command) {
     break;
   case 'detect':
     detect(flags);
+    break;
+  case 'image':
+    image(flags);
     break;
   default:
     install(flags);

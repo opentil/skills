@@ -491,7 +491,7 @@ Every TIL entry must follow these rules:
   3. Code example, command, or concrete demonstration — for multi-faceted topics, use 2-3 code blocks that build progressively (basic usage → advanced usage → full example or edge case)
   4. (Optional) Caveats, edge cases, or reference links
   - *Variant — "Expected vs. Actual"*: Show the expected behavior first, then reveal the surprising actual result. Effective for gotcha/pitfall TILs where the "aha" is in the contrast.
-- **Content**: Use the most efficient format for the knowledge — tables for comparisons, code blocks for examples, lists for enumerations, math (`$inline$` / `$$display$$`) for formulas with fractions/subscripts/superscripts/greek letters, Mermaid diagrams (` ```mermaid `) for flows/states/sequences that text cannot clearly express, images/screenshots for visual bugs or UI behavior. Simple expressions like `O(n)` stay as inline code; use math only when notation complexity warrants it. Only use prose when explaining causation or context. Never pad content; if one sentence suffices, don't write a paragraph.
+- **Content**: Use the most efficient format for the knowledge — tables for comparisons, code blocks for examples, lists for enumerations, math (`$inline$` / `$$display$$`) for formulas with fractions/subscripts/superscripts/greek letters, Mermaid diagrams (` ```mermaid `) for flows/states/sequences that text cannot clearly express, images/screenshots for visual bugs or UI behavior (see **Image Support** below). Simple expressions like `O(n)` stay as inline code; use math only when notation complexity warrants it. Only use prose when explaining causation or context. Never pad content; if one sentence suffices, don't write a paragraph.
 - **Content length**: Most entries are 10-100 lines. Shorter is fine when the insight is simple. Longer is fine for multi-example walkthroughs — let topic complexity dictate length.
 - **Tags**: 1-3 lowercase tags (if the topic warrants more, pick the 3 most specific). Use concrete technology/tool names, not meta-categories. Generic tags like `programming`, `til`, `webdev`, or `backend` describe *what TIL is* rather than *what the insight is about* — avoid them. Domain-specific tags like `cooking` or `astronomy` are fine because they name the subject area. Examples: `[go, concurrency]`, `[postgresql, indexing]`, `[css, flexbox]`, `[docker, networking]`, `[cooking, fermentation]`, `[astronomy, optics]`.
 - **Lang**: Detect from content. Chinese -> `zh-CN`, Traditional Chinese -> `zh-TW`, English -> `en`, Japanese -> `ja`, Korean -> `ko`.
@@ -501,6 +501,48 @@ Every TIL entry must follow these rules:
   - *Command-only*: A single command or snippet with no explanation of when/why to use it. At minimum, explain the context or problem it solves.
   - *Title = body*: If the title fully conveys the insight and the body just restates it, either expand with a concrete example or accept that the insight may be too thin for a standalone entry.
   - *"X exists" without "so what"*: Simply noting a feature or tool exists is not a TIL. Explain why it matters, when you'd reach for it, or what problem it solves.
+
+## Image Support
+
+When the user's conversation includes images (screenshots, diagrams, photos) that are relevant to the TIL entry, upload them and embed markdown image links in the body.
+
+### When to Include Images
+
+- **Include**: Screenshots of visual bugs, UI before/after comparisons, architecture diagrams, terminal output that's hard to reproduce as text, visual diffs.
+- **Don't include**: Plain text terminal output (use code blocks), simple command output, anything that's better represented as text.
+
+### Upload Flow
+
+1. Detect image file path in the conversation (user-pasted images are saved as temporary files)
+2. Upload via CLI: `npx @opentil/cli image upload <path> --json`
+3. Parse the JSON output to get `url`
+4. Embed in the TIL markdown body: `![descriptive alt text](url)`
+
+The CLI handles the full 3-step flow (presign → upload to storage → confirm) and returns:
+```json
+{ "id": "...", "url": "https://...", "width": 800, "height": 600, "byte_size": 12345, "content_type": "image/png" }
+```
+
+### Placement Rules
+
+- Place the image at the point of relevance in the content, not at the end as an afterthought
+- Write descriptive alt text: `![CSS grid gap collapsing between nested containers](url)` not `![screenshot](url)`
+- For before/after comparisons, label clearly: "**Before:**" / "**After:**" above each image
+- Keep images to a maximum of 3 per entry — more than that signals the entry should be split
+
+### Multiple Images
+
+Upload each image separately. If the user provides multiple images and it's ambiguous where they should go, ask the user for preferred placement.
+
+### Error Handling
+
+- **Upload fails (network/auth)**: Save the draft locally with the local image path in the body. The image path will be a placeholder until the user runs `til sync` with network access.
+- **File too large (>5 MB)**: Inform the user and suggest compressing or resizing the image before retrying.
+- **Unsupported format**: Inform the user. Supported: JPEG, PNG, GIF, WebP.
+
+### Offline / Local Draft
+
+When saving locally (no token or network), copy the image to `~/.til/drafts/images/` and reference it with a local path in the markdown body. Add image metadata to the draft frontmatter `images` field so `til sync` knows which files need uploading. During sync, images are uploaded first, local paths are replaced with URLs in memory, and only after the entry POST succeeds are the local image files deleted. If the POST fails, both the draft and its images are preserved unchanged for the next sync attempt.
 
 ## Result Messages
 

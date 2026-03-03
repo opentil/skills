@@ -320,6 +320,112 @@ Note: `entries_count` is the site-level count of entries in that category.
 
 Used by `/til categories` to display category listing.
 
+## POST /uploads/presign -- Presign Direct Upload
+
+Request a presigned URL for uploading an image directly to storage (R2/S3). This is step 1 of the 3-step image upload flow.
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `filename` | string | yes | Original filename (e.g. `screenshot.png`) |
+| `content_type` | string | yes | MIME type: `image/jpeg`, `image/png`, `image/gif`, or `image/webp` |
+| `byte_size` | integer | yes | File size in bytes (max 5 MB = 5242880) |
+| `checksum` | string | yes | Base64-encoded MD5 hash of the file content |
+
+### 201 Response
+
+```json
+{
+  "signed_id": "eyJfcmFpbHMiOns...",
+  "direct_upload": {
+    "url": "https://storage.example.com/uploads/...",
+    "headers": {
+      "Content-MD5": "base64hash..."
+    }
+  }
+}
+```
+
+### Error Codes
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 400 | `missing_filename` | Filename not provided |
+| 400 | `missing_content_type` | Content type not provided |
+| 400 | `missing_checksum` | Checksum not provided |
+| 422 | `unsupported_content_type` | Content type not in allowed list |
+| 422 | `invalid_byte_size` | Byte size is zero or negative |
+| 422 | `file_too_large` | File exceeds 5 MB limit |
+| 422 | `storage_limit_exceeded` | User's storage quota exceeded |
+
+## Image Upload Flow (3-Step)
+
+Complete flow for uploading an image via the API:
+
+```bash
+# Step 1: Get presigned URL
+PRESIGN=$(curl -s -X POST https://opentil.ai/api/v1/uploads/presign \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"filename":"screenshot.png","content_type":"image/png","byte_size":12345,"checksum":"base64md5..."}')
+
+SIGNED_ID=$(echo $PRESIGN | jq -r '.signed_id')
+UPLOAD_URL=$(echo $PRESIGN | jq -r '.direct_upload.url')
+
+# Step 2: Upload file directly to storage
+curl -X PUT "$UPLOAD_URL" \
+  -H "Content-Type: image/png" \
+  --data-binary @screenshot.png
+
+# Step 3: Create Image record
+curl -s -X POST https://opentil.ai/api/v1/images \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"signed_id\":\"$SIGNED_ID\"}"
+```
+
+The CLI command `npx @opentil/cli image upload <file> --json` performs all 3 steps automatically.
+
+## POST /images -- Create Image Record
+
+Bind a direct-uploaded file to an Image record. This is step 3 of the upload flow — call after uploading to the presigned URL.
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `signed_id` | string | yes | The `signed_id` from the presign response |
+| `description` | string | no | Alt text / description (max 255 chars) |
+
+### 201 Response
+
+```json
+{
+  "id": "123456",
+  "url": "https://cdn.example.com/original/image.png",
+  "thumb_url": "https://cdn.example.com/thumb/image.png",
+  "medium_url": "https://cdn.example.com/medium/image.png",
+  "byte_size": 12345,
+  "content_type": "image/png",
+  "width": 800,
+  "height": 600,
+  "dimensions": "800x600",
+  "description": null,
+  "created_at": "2026-03-04T10:00:00Z"
+}
+```
+
+### Error Codes
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 400 | `missing_signed_id` | signed_id not provided |
+| 400 | `invalid_signed_id` | signed_id is invalid or expired |
+| 422 | `corrupt_image` | File failed image integrity validation |
+| 422 | `file_not_uploaded` | File not yet uploaded to storage |
+| 422 | `storage_limit_exceeded` | Storage quota exceeded |
+
 ## Rate Limits
 
 - Authenticated: 5,000 requests/hour

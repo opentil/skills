@@ -48,10 +48,13 @@ There is no explicit `implements` keyword...
 | `agent_name` | string | Agent display name, e.g. `Claude Code` (optional) |
 | `agent_model` | string | Human-readable model name, e.g. `Claude Opus 4.6` (optional) |
 | `profile` | string | Active profile name at save time (optional). Used during sync to determine which account's token to use. Omitted when no profiles are configured. |
+| `images` | array | Local image references (optional). Each entry: `{ local: "~/.til/drafts/images/slug-1.png", alt: "description" }` |
 
 The `source`, `agent_name`, and `agent_model` fields preserve attribution so that when syncing to the API, the correct headers and tags can be applied.
 
 The `profile` field ensures drafts are synced to the correct account in multi-profile setups.
+
+The `images` field tracks local image files that need to be uploaded during sync. The markdown body references these images with local paths (e.g. `![alt](~/.til/drafts/images/slug-1.png)`) which are replaced with remote URLs after upload.
 
 ## Sync Protocol
 
@@ -79,26 +82,46 @@ Found 3 local drafts from before. Sync to @hong (personal)?
 
 Wait for user confirmation. If the user declines, do not ask again this session.
 
+### Step 2.5: Integrity Check
+
+Before syncing, validate local draft consistency:
+
+1. **Missing images**: For each draft with an `images` field, verify every `local` path exists on disk.
+   - If a referenced image file is missing: warn the user, skip that draft.
+   - Report: `Skipped: <title> — missing image: ~/.til/drafts/images/slug-1.png`
+2. **Orphan images**: Scan `~/.til/drafts/images/` for files not referenced by any draft's `images` field or markdown body.
+   - List orphans to the user: `Found 2 orphan images in ~/.til/drafts/images/. Remove? (y/n)`
+   - On confirm: delete orphan files. On decline: leave them.
+3. **Duplicate image refs**: If two drafts reference the same image file, warn but proceed — each sync will upload a separate copy.
+
+This check runs once per sync invocation, before any uploads.
+
 ### Step 3: Sync Each Draft
 
 For each `.md` file in `~/.til/drafts/`:
 
-1. Parse the frontmatter (title, tags, lang, source, agent_name, agent_model, profile)
+1. Parse the frontmatter (title, tags, lang, source, agent_name, agent_model, profile, images)
 2. **Resolve token for this draft** (profile matching):
    - If `$OPENTIL_TOKEN` is set → always use it (env var overrides all profiles)
    - If `profile` field is present → look up that profile's token in `~/.til/credentials`
      - Profile found → use its token
      - Profile not found → skip this draft, report: `Skipped: profile "work" not found (/til auth list)`
    - If `profile` field is absent (old drafts) → use the current active profile's token
-3. Read the content body (everything after the second `---`)
-4. POST to API (using the resolved token):
+3. **Upload pending images** (if `images` field is present):
+   - For each image in the `images` array:
+     - Upload via `npx @opentil/cli image upload <local_path> --json`
+     - On success: replace the local path in the markdown body **in memory only** (do not write back to draft file yet)
+     - On failure: keep the local path, skip this draft, record the error
+   - Do NOT delete image files yet — wait until the entry POST succeeds
+4. Read the content body (everything after the second `---`, with image URLs substituted in memory)
+5. POST to API (using the resolved token):
    - Set `published: false`
    - Set `X-OpenTIL-Source` header based on `source` field
    - Set `X-OpenTIL-Agent` header from `agent_name` field (if present)
    - Set `X-OpenTIL-Model` header from `agent_model` field (if present)
    - Add `agent-assisted` tag if `source` is `agent`
-5. On 201 success: delete the local file
-6. On failure: keep the local file, record the error
+6. On 201 success: delete the local draft file AND its associated image files from `~/.til/drafts/images/`
+7. On failure: keep the local draft file and image files unchanged, record the error
 
 ### Step 4: Report Results
 
