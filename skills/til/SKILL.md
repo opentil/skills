@@ -434,7 +434,7 @@ X-OpenTIL-Client: til-skill/<version from metadata>
 - Source: always `agent` — the agent authors the content regardless of trigger method
 - Agent: use your tool's display name (e.g. `Claude Code`, `Cursor`, `GitHub Copilot`). Do not use a slug.
 - Model: use a human-readable model name (e.g. `Claude Opus 4.6`, `GPT-4o`, `Gemini 2.5 Pro`). Do not use a model ID.
-- Client: use the format `til-skill/{version}` where version comes from this file's frontmatter metadata (currently `1.26.0`).
+- Client: use the format `til-skill/{version}` where version comes from this file's frontmatter metadata.
 - Agent and Model are optional -- omit them if you are unsure. Client is required.
 
 ### Layer 2: Tag Convention
