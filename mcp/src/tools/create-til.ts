@@ -1,6 +1,7 @@
 import type { ApiClient } from '../api-client.js';
 import { formatError } from '../errors.js';
-import { categoriesCache, fetchCategories } from './list-categories.js';
+import { taxonomyCache, fetchCategories, fetchTags } from './list-categories.js';
+import type { TagItem } from './list-categories.js';
 
 interface CreateParams {
   title: string;
@@ -29,7 +30,13 @@ async function resolveCategory(
   api: ApiClient,
   name: string,
 ): Promise<string> {
-  const categories = await fetchCategories(api);
+  let categories;
+  try {
+    categories = await fetchCategories(api);
+  } catch {
+    // Category resolution failure should never block entry creation
+    return name;
+  }
   if (categories.length === 0) return name;
 
   const lower = name.toLowerCase();
@@ -51,6 +58,47 @@ async function resolveCategory(
   return name;
 }
 
+/**
+ * Match a tag name against cached tags.
+ * Priority: exact name → case-insensitive → slug match.
+ * No match → return original name (server will find-or-create).
+ */
+function resolveTagName(tagName: string, cachedTags: TagItem[]): string {
+  const lower = tagName.toLowerCase();
+  const slug = lower.replace(/\s+/g, '-');
+
+  // Exact match
+  const exact = cachedTags.find((t) => t.name === tagName);
+  if (exact) return exact.name;
+
+  // Case-insensitive match
+  const ci = cachedTags.find((t) => t.name.toLowerCase() === lower);
+  if (ci) return ci.name;
+
+  // Slug match
+  const slugMatch = cachedTags.find((t) => t.slug === slug);
+  if (slugMatch) return slugMatch.name;
+
+  // No match — return original (server will find-or-create)
+  return tagName;
+}
+
+async function resolveTags(
+  api: ApiClient,
+  names: string[],
+): Promise<string[]> {
+  let cachedTags: TagItem[];
+  try {
+    cachedTags = await fetchTags(api);
+  } catch {
+    // Tag resolution failure should never block entry creation
+    return names;
+  }
+
+  if (cachedTags.length === 0) return names;
+  return names.map((name) => resolveTagName(name, cachedTags));
+}
+
 export async function createTil(
   api: ApiClient,
   params: CreateParams,
@@ -62,6 +110,12 @@ export async function createTil(
       categoryName = await resolveCategory(api, categoryName);
     }
 
+    // Resolve tag names against cache
+    let tagNames = params.tags;
+    if (tagNames && tagNames.length > 0) {
+      tagNames = await resolveTags(api, tagNames);
+    }
+
     const body: Record<string, unknown> = {
       entry: {
         title: params.title,
@@ -70,15 +124,15 @@ export async function createTil(
         published: params.published ?? true,
         ...(params.summary && { summary: params.summary }),
         ...(params.lang && { lang: params.lang }),
-        ...(params.tags && { tag_names: params.tags }),
+        ...(tagNames && { tag_names: tagNames }),
         ...(categoryName && { category_name: categoryName }),
       },
     };
 
     const e = await api.post<EntryResponse>('/entries', body);
 
-    // Invalidate category cache — entry creation may have created a new category
-    categoriesCache.invalidate();
+    // Invalidate taxonomy cache — entry creation may have created new tags/categories
+    taxonomyCache.invalidate();
 
     return [
       `Created: ${e.title}`,

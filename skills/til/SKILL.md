@@ -98,8 +98,8 @@ Reserved words: `list`, `publish`, `unpublish`, `edit`, `search`, `delete`, `sta
 |------------|--------------------|
 | `/til <content>` | none |
 | `/til` (extract from conversation) | none |
-| `/til list\|status\|tags` | [references/management.md](references/management.md) |
-| `/til categories` | [references/categories.md](references/categories.md) |
+| `/til list\|status` | [references/management.md](references/management.md) |
+| `/til tags\|categories` | [references/categories.md](references/categories.md) |
 | `/til publish\|unpublish\|edit\|search\|delete\|batch` | [references/management.md](references/management.md) |
 | `/til sync` | [references/management.md](references/management.md), [references/local-drafts.md](references/local-drafts.md) |
 | `/til update` | none (self-contained instructions below) |
@@ -113,7 +113,7 @@ Reserved words: `list`, `publish`, `unpublish`, `edit`, `search`, `delete`, `sta
 | API returns non-2xx after inline error handling is insufficient | [references/api.md](references/api.md) |
 | Auto-detection context (proactive TIL suggestion) | [references/auto-detection.md](references/auto-detection.md) |
 | No token found (first-run local fallback) | [references/local-drafts.md](references/local-drafts.md) |
-| Category lookup/matching during entry creation | [references/categories.md](references/categories.md) |
+| Category/tag lookup/matching during entry creation | [references/categories.md](references/categories.md) |
 
 ## API Quick Reference
 
@@ -400,7 +400,7 @@ List site tags sorted by usage count (top 20). Requires token.
 
 List site categories. Requires token. Supports `--force` to bypass cache.
 
-- Uses file cache (`~/.til/cache/categories.json`, 10 min TTL) — see [references/categories.md](references/categories.md)
+- Uses taxonomy cache (`~/.til/cache/taxonomy.json`, 10 min TTL) — see [references/categories.md](references/categories.md)
 - Show as compact table with name, entry count, and description
 
 ### `/til batch <topics>`
@@ -527,7 +527,8 @@ Every TIL entry must follow these rules:
 - **Content length**: Most entries are 10-100 lines. Shorter is fine when the insight is simple. Longer is fine for multi-example walkthroughs — let topic complexity dictate length.
 - **Tags**: 1-3 lowercase tags (if the topic warrants more, pick the 3 most specific). Use concrete technology/tool names, not meta-categories. Generic tags like `programming`, `til`, `webdev`, or `backend` describe *what TIL is* rather than *what the insight is about* — avoid them. Domain-specific tags like `cooking` or `astronomy` are fine because they name the subject area. Examples: `[go, concurrency]`, `[postgresql, indexing]`, `[css, flexbox]`, `[docker, networking]`, `[cooking, fermentation]`, `[astronomy, optics]`.
 - **Lang**: Detect from content. Chinese -> `zh-CN`, Traditional Chinese -> `zh-TW`, English -> `en`, Japanese -> `ja`, Korean -> `ko`.
-- **Category**: Before creating an entry, try calling `list_categories` (uses file cache for speed — see [references/categories.md](references/categories.md)). Match the content to an existing category if a good fit exists. If no existing category fits, suggest a new concise category name. Include `category_name` in the creation request. If `list_categories` fails, proceed without `category_name` -- never let a category lookup failure block entry creation.
+- **Category**: Before creating an entry, try loading the taxonomy cache (see [references/categories.md](references/categories.md)). Match the content to an existing category if a good fit exists. If no existing category fits, suggest a new concise category name. Include `category_name` in the creation request. If the cache/API fails, proceed without `category_name` -- never let a category lookup failure block entry creation.
+- **Tag matching**: When tags are specified, match each tag name against the taxonomy cache (exact → case-insensitive → slug). Use matched canonical names to avoid duplicates like "Rails" vs "rails". Unmatched names pass through as-is (server creates them). If cache fetch fails, use original names.
 - **Summary**: 1-2 sentences, plain text (no markdown). Max 500 chars and must be shorter than the content body. Same language as content. Self-contained: the reader should understand the core takeaway from the summary alone. Be specific about what the reader will learn, not meta ("this article discusses..."). No first person, no meta-descriptions. Omit if the content is already very short (under ~200 chars) -- the excerpt fallback is sufficient.
 - **Anti-patterns** (avoid these):
   - *Command-only*: A single command or snippet with no explanation of when/why to use it. At minimum, explain the context or problem it solves.

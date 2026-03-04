@@ -145,7 +145,7 @@ server.tool(
     tags: z
       .array(z.string())
       .optional()
-      .describe('Tag names (will be created if they do not exist)'),
+      .describe('Tag names (fuzzy-matched against existing tags: exact → case-insensitive → slug; unmatched names are created automatically)'),
     visibility: z
       .enum(['public', 'unlisted', 'private'])
       .default('public')
