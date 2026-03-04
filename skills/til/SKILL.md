@@ -444,7 +444,7 @@ Reload the /til skill to use the new version.
 ```
 
 **Fallback (no Node.js):**
-Re-read https://opentil.ai/connect/skill.md and follow the manual install section.
+Re-read https://opentil.ai/skill.md and follow the manual install section.
 
 ## Agent Identity
 
