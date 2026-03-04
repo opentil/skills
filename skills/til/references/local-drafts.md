@@ -121,7 +121,8 @@ For each `.md` file in `~/.til/drafts/`:
    - Set `X-OpenTIL-Model` header from `agent_model` field (if present)
    - Add `agent-assisted` tag if `source` is `agent`
 6. On 201 success: delete the local draft file AND its associated image files from `~/.til/drafts/images/`
-7. On failure: keep the local draft file and image files unchanged, record the error
+7. On 409 (duplicate): treat as "already uploaded" — **delete the local draft file** and its images. Display as `= title (already exists)` in the report. Count toward successes, not failures.
+8. On other failure: keep the local draft file and image files unchanged, record the error
 
 ### Step 4: Report Results
 

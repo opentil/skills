@@ -62,14 +62,16 @@ export class ApiClient {
     if (!res.ok) {
       let code = 'api_error';
       let message = `HTTP ${res.status}`;
+      let parsedBody: Record<string, unknown> | undefined;
       try {
         const body = await res.json();
+        parsedBody = body;
         code = body?.error?.code || code;
         message = body?.error?.message || message;
       } catch {
         // ignore parse errors
       }
-      throw new ApiError(res.status, code, message);
+      throw new ApiError(res.status, code, message, parsedBody);
     }
 
     return res.json() as Promise<T>;

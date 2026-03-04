@@ -1,5 +1,5 @@
 import type { ApiClient } from '../api-client.js';
-import { formatError } from '../errors.js';
+import { ApiError, formatError } from '../errors.js';
 import { taxonomyCache, fetchCategories, fetchTags } from './list-categories.js';
 import type { TagItem } from './list-categories.js';
 
@@ -144,6 +144,13 @@ export async function createTil(
       .filter(Boolean)
       .join('\n');
   } catch (err) {
+    if (err instanceof ApiError && err.status === 409 && err.code === 'duplicate_content') {
+      const existing = err.body?.entry as Record<string, unknown> | undefined;
+      const lines = ['Duplicate content — this entry already exists on the server. No action needed.'];
+      if (existing?.id) lines.push(`ID: ${existing.id}`);
+      if (existing?.url) lines.push(`URL: ${existing.url}`);
+      return lines.join('\n');
+    }
     return `Error creating entry: ${formatError(err)}`;
   }
 }

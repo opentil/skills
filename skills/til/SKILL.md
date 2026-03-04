@@ -123,6 +123,9 @@ Reserved words: `list`, `publish`, `unpublish`, `edit`, `search`, `delete`, `sta
 curl -X POST "https://opentil.ai/api/v1/entries" \
   -H "Authorization: Bearer $OPENTIL_TOKEN" \
   -H "Content-Type: application/json" \
+  -H "X-OpenTIL-Source: agent" \
+  -H "X-OpenTIL-Agent: <your agent display name>" \
+  -H "X-OpenTIL-Model: <human-readable model name>" \
   -d '{
     "entry": {
       "title": "Go interfaces are satisfied implicitly",
@@ -157,6 +160,9 @@ curl -X POST "https://opentil.ai/api/v1/entries" \
 > curl -s -X POST "https://opentil.ai/api/v1/entries" \
 >   -H "Authorization: Bearer $OPENTIL_TOKEN" \
 >   -H "Content-Type: application/json" \
+>   -H "X-OpenTIL-Source: agent" \
+>   -H "X-OpenTIL-Agent: <your agent display name>" \
+>   -H "X-OpenTIL-Model: <human-readable model name>" \
 >   -d @/tmp/til-payload.json
 >
 > # 3. Cleanup
@@ -696,7 +702,9 @@ After the first successful API call in a conversation, check the installed skill
 
 ## Error Handling
 
-**On ANY API failure, always save the draft locally first.** Never let user content be lost.
+**On API failure (except 409 duplicate), always save the draft locally first.** Never let user content be lost.
+
+**409 -- Duplicate content:** The server detected identical content already exists. Do NOT save a local draft (the content is already on the server). Do NOT retry. Show the existing entry's URL from the response body and inform the user "This content has already been published." Set `last_created_entry_id` to the existing entry's `id` from the response (the 409 response body has the same shape as a 201 response).
 
 **422 -- Validation error:** Analyze the error response, fix the issue (e.g. truncate title to 200 chars, correct lang code), and retry. Only save locally if the retry also fails.
 
