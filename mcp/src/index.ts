@@ -186,13 +186,19 @@ server.tool(
 server.tool(
   'list_categories',
   "List all categories for the user's site",
-  {},
+  {
+    force: z
+      .boolean()
+      .optional()
+      .default(false)
+      .describe('Force refresh, bypassing cache'),
+  },
   { readOnlyHint: true },
-  async () => {
+  async ({ force }) => {
     const api = createApi();
     if (!api) return { content: [{ type: 'text' as const, text: NO_TOKEN_MESSAGE }] };
 
-    const text = await listCategories(api);
+    const text = await listCategories(api, force);
     return { content: [{ type: 'text' as const, text }] };
   },
 );

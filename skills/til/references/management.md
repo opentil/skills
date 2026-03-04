@@ -848,41 +848,7 @@ No tags yet. Tags are created automatically when you publish entries.
 
 ### `/til categories`
 
-List site categories. Requires token.
-
-**API call:** `GET /categories`
-
-**Display format:**
-
-```
-Your categories (3):
-
-  Name             Entries  Description
-  Backend              12   Server-side topics
-  Frontend              8   Client-side development
-  DevOps                5   Infrastructure and deployment
-
-  3 categories
-```
-
-**Multi-profile variant** (≥2 profiles):
-
-```
-Your categories (3):
-
-  Account: @hong (personal)
-
-  Name             Entries  Description
-  Backend              12   Server-side topics
-  ...
-
-  3 categories
-```
-
-**Empty state:**
-```
-No categories yet. Create them at: https://opentil.ai/dashboard/topics
-```
+→ Moved to [references/categories.md](categories.md). Includes cache protocol, display format, and `--force` flag.
 
 ### `/til batch <topics>`
 
