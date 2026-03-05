@@ -83,10 +83,13 @@ The first word after `/til` determines the action. Reserved words route to manag
 | `/til auth list` | List all profiles |
 | `/til auth remove <name>` | Remove a profile |
 | `/til auth rename <old> <new>` | Rename a profile |
+| `/til config` | View publishing preferences |
+| `/til config set <key> <value>` | Set a preference |
+| `/til config reset` | Reset all preferences to defaults |
 | `/til <anything else>` | Capture content as a new TIL |
 | `/til` | Extract insights from conversation (multi-candidate) |
 
-Reserved words: `list`, `publish`, `unpublish`, `edit`, `search`, `delete`, `status`, `sync`, `tags`, `categories`, `batch`, `update`, `auth`.
+Reserved words: `list`, `publish`, `unpublish`, `edit`, `search`, `delete`, `status`, `sync`, `tags`, `categories`, `batch`, `update`, `auth`, `config`.
 
 ## Reference Loading
 
@@ -105,6 +108,7 @@ Reserved words: `list`, `publish`, `unpublish`, `edit`, `search`, `delete`, `sta
 | `/til update` | none (self-contained instructions below) |
 | `/til auth` | [references/management.md](references/management.md), [references/api.md](references/api.md) |
 | `/til auth switch\|list\|remove\|rename` | [references/management.md](references/management.md) |
+| `/til config\|config set\|config reset` | [references/config.md](references/config.md) |
 
 ### On-demand (load only when the situation arises):
 
@@ -195,7 +199,8 @@ curl -X POST "https://opentil.ai/api/v1/entries" \
 | `/entries/:id` | DELETE | Permanently delete entry |
 | `/entries/:id/publish` | POST | Publish a draft |
 | `/entries/:id/unpublish` | POST | Revert to draft |
-| `/site` | GET | Site info (username, entry counts, etc.) |
+| `/site` | GET | Site info (username, entry counts, preferences, etc.) |
+| `/site` | PATCH | Update site settings (including `preferences`) |
 | `/tags?sort=popular` | GET | List tags with usage counts |
 | `/categories` | GET | List categories with entry counts |
 
@@ -206,6 +211,9 @@ curl -X POST "https://opentil.ai/api/v1/entries" \
 Every `/til` invocation follows this flow:
 
 1. **Generate** -- craft the TIL entry (title, body, summary, tags, lang)
+1.5. **Load preferences** -- resolve publishing preferences (cache → API `GET /site` → hardcoded defaults). See [references/config.md](references/config.md) for cache protocol.
+   - Apply `default_visibility` to API request
+   - If `custom_instructions` is present, treat them as additional Content Guidelines (user rules take precedence over defaults)
 2. **Check token** -- resolve token (env var → active profile in `~/.til/credentials`)
    - If `~/.til/credentials` exists in old plain-text format, migrate to YAML `default` profile first
    - **Found** -> POST to API with `published: true` -> show published URL
@@ -503,6 +511,8 @@ Do NOT append any footer or attribution text to the content body.
 | Attribution | Automatic (backend) | Automatic (backend) | Automatic (backend) |
 
 ## Content Guidelines
+
+Before generating content, check for `custom_instructions` in preferences (see Execution Flow step 1.5). If present, append them as additional rules after the guidelines below. Custom instructions take precedence when they conflict with defaults.
 
 Every TIL entry must follow these rules:
 
@@ -826,6 +836,46 @@ In Go, a type implements an interface...
 The `profile` field records the active profile name at save time, ensuring sync uses the correct account's token. Omitted when no profiles are configured (backward-compatible).
 
 > Full directory structure, metadata fields, and sync protocol: see references/local-drafts.md
+
+## `/til config` -- Publishing Preferences
+
+View and modify publishing preferences. Requires token.
+
+### `/til config`
+
+Display current preferences:
+
+```
+Publishing Preferences:
+
+  Visibility:      Public
+
+  Custom instructions:
+    - Use casual tone
+    - Never start with "Note:"
+
+  Edit at: https://opentil.ai/dashboard/settings/publishing
+```
+
+- Load preferences from cache (`~/.til/cache/preferences.json`) -> fallback to `GET /site` -> extract `preferences`
+
+### `/til config set <key> <value>`
+
+Set a single preference. Keys: `visibility`, `instructions`.
+
+- `PATCH /api/v1/site` with the updated preferences
+- Invalidate preferences cache
+- Show updated value
+
+### `/til config reset`
+
+Reset all preferences to defaults.
+
+- Confirm before resetting
+- `PATCH /api/v1/site` with default preferences (`defaults: { visibility: "public" }`, `custom_instructions: null`)
+- Invalidate preferences cache
+
+> Detailed flows, cache protocol, and display formats: see [references/config.md](references/config.md)
 
 ## Notes
 

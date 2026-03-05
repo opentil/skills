@@ -239,6 +239,10 @@ Fetch the authenticated user's site details. Requires `read:entries` scope.
   "discoverable": true,
   "theme_slug": "default",
   "theme_mode": "auto",
+  "preferences": {
+    "default_visibility": "public",
+    "custom_instructions": null
+  },
   "last_posted_at": "2026-02-10T14:30:22Z",
   "created_at": "2025-06-01T00:00:00Z",
   "updated_at": "2026-02-10T14:30:22Z"
@@ -247,8 +251,34 @@ Fetch the authenticated user's site details. Requires `read:entries` scope.
 
 - `entries_count`: total entries (including drafts)
 - `published_entries_count`: published entries only
+- `preferences`: publishing defaults and custom instructions (see [config.md](config.md) for cache protocol)
+  - **Read format** (GET response): flattened — `default_visibility`, `custom_instructions`
+  - **Write format** (PATCH request): nested — `defaults.visibility`, `custom_instructions`
 
-Used by `/til status` to display site info.
+Used by `/til status` to display site info, and by `/til config` to display/update preferences.
+
+## PATCH /site -- Update Site
+
+Update site settings including preferences. Requires `write:entries` scope.
+
+### Request Body
+
+To update preferences, include a `preferences` key (separate from `site` params):
+
+```json
+{
+  "preferences": {
+    "defaults": { "visibility": "unlisted" },
+    "custom_instructions": "Use casual tone"
+  }
+}
+```
+
+Only include fields being changed — the server deep-merges with existing settings. Regular site params (`site.title`, `site.bio`, etc.) can be sent alongside `preferences`.
+
+### 200 Response
+
+Returns the full SiteDetailSerializer response with updated fields.
 
 ## GET /tags -- List Tags
 

@@ -18,6 +18,7 @@ interface CredentialsFile {
 export interface Config {
   token: string;
   host: string;
+  profile: string;
 }
 
 /**
@@ -34,6 +35,7 @@ export function resolveConfig(): Config | null {
     return {
       token: envToken,
       host: process.env.OPENTIL_HOST || DEFAULT_HOST,
+      profile: 'env',
     };
   }
 
@@ -52,6 +54,7 @@ export function resolveConfig(): Config | null {
     return {
       token: profile.token,
       host: profile.host || DEFAULT_HOST,
+      profile: activeProfile,
     };
   } catch {
     return null;

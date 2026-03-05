@@ -35,10 +35,10 @@ const NO_TOKEN_MESSAGE = [
   'Create a token at: https://opentil.ai/dashboard/settings/tokens',
 ].join('\n');
 
-function createApi(): ApiClient | null {
+function createApi(): { api: ApiClient; profile: string } | null {
   const config = resolveConfig();
   if (!config) return null;
-  return new ApiClient(config);
+  return { api: new ApiClient(config), profile: config.profile };
 }
 
 const server = new McpServer(
@@ -61,10 +61,10 @@ server.tool(
   {},
   { readOnlyHint: true },
   async () => {
-    const api = createApi();
-    if (!api) return { content: [{ type: 'text' as const, text: NO_TOKEN_MESSAGE }] };
+    const ctx = createApi();
+    if (!ctx) return { content: [{ type: 'text' as const, text: NO_TOKEN_MESSAGE }] };
 
-    const text = await getProfile(api);
+    const text = await getProfile(ctx.api, ctx.profile);
     return { content: [{ type: 'text' as const, text }] };
   },
 );
@@ -83,10 +83,10 @@ server.tool(
   },
   { readOnlyHint: true },
   async ({ limit }) => {
-    const api = createApi();
-    if (!api) return { content: [{ type: 'text' as const, text: NO_TOKEN_MESSAGE }] };
+    const ctx = createApi();
+    if (!ctx) return { content: [{ type: 'text' as const, text: NO_TOKEN_MESSAGE }] };
 
-    const text = await getRecentLearnings(api, limit);
+    const text = await getRecentLearnings(ctx.api, limit);
     return { content: [{ type: 'text' as const, text }] };
   },
 );
@@ -110,10 +110,10 @@ server.tool(
   },
   { readOnlyHint: true },
   async ({ query, tag, limit }) => {
-    const api = createApi();
-    if (!api) return { content: [{ type: 'text' as const, text: NO_TOKEN_MESSAGE }] };
+    const ctx = createApi();
+    if (!ctx) return { content: [{ type: 'text' as const, text: NO_TOKEN_MESSAGE }] };
 
-    const text = await searchKnowledge(api, query, tag, limit);
+    const text = await searchKnowledge(ctx.api, query, tag, limit);
     return { content: [{ type: 'text' as const, text }] };
   },
 );
@@ -127,10 +127,10 @@ server.tool(
   },
   { readOnlyHint: true },
   async ({ id }) => {
-    const api = createApi();
-    if (!api) return { content: [{ type: 'text' as const, text: NO_TOKEN_MESSAGE }] };
+    const ctx = createApi();
+    if (!ctx) return { content: [{ type: 'text' as const, text: NO_TOKEN_MESSAGE }] };
 
-    const text = await getEntry(api, id);
+    const text = await getEntry(ctx.api, id);
     return { content: [{ type: 'text' as const, text }] };
   },
 );
@@ -165,10 +165,10 @@ server.tool(
   },
   { destructiveHint: false, readOnlyHint: false, idempotentHint: false },
   async ({ title, content, tags, visibility, published, summary, lang, category_name }) => {
-    const api = createApi();
-    if (!api) return { content: [{ type: 'text' as const, text: NO_TOKEN_MESSAGE }] };
+    const ctx = createApi();
+    if (!ctx) return { content: [{ type: 'text' as const, text: NO_TOKEN_MESSAGE }] };
 
-    const text = await createTil(api, {
+    const text = await createTil(ctx.api, {
       title,
       content,
       tags,
@@ -195,10 +195,10 @@ server.tool(
   },
   { readOnlyHint: true },
   async ({ force }) => {
-    const api = createApi();
-    if (!api) return { content: [{ type: 'text' as const, text: NO_TOKEN_MESSAGE }] };
+    const ctx = createApi();
+    if (!ctx) return { content: [{ type: 'text' as const, text: NO_TOKEN_MESSAGE }] };
 
-    const text = await listCategories(api, force);
+    const text = await listCategories(ctx.api, force);
     return { content: [{ type: 'text' as const, text }] };
   },
 );
