@@ -1,7 +1,7 @@
 import type { ApiClient } from '../api-client.js';
 import { ApiError, formatError } from '../errors.js';
-import { taxonomyCache, fetchCategories, fetchTags } from './list-categories.js';
-import type { TagItem } from './list-categories.js';
+import { taxonomyCache, fetchCategories, fetchTags, fetchSeries } from './list-categories.js';
+import type { TagItem, SeriesItem } from './list-categories.js';
 
 interface CreateParams {
   title: string;
@@ -12,6 +12,7 @@ interface CreateParams {
   summary?: string;
   lang?: string;
   category_name?: string;
+  series_name?: string;
 }
 
 interface EntryResponse {
@@ -55,6 +56,38 @@ async function resolveCategory(
   if (slugMatch) return slugMatch.name;
 
   // No match — return original name (server will create it)
+  return name;
+}
+
+/**
+ * Match a series name against cached series.
+ * Priority: exact title → case-insensitive → slug match.
+ * No match → return original name (server will find-or-create).
+ */
+async function resolveSeries(
+  api: ApiClient,
+  name: string,
+): Promise<string> {
+  let seriesList: SeriesItem[];
+  try {
+    seriesList = await fetchSeries(api);
+  } catch {
+    return name;
+  }
+  if (seriesList.length === 0) return name;
+
+  const lower = name.toLowerCase();
+  const slug = lower.replace(/\s+/g, '-');
+
+  const exact = seriesList.find((s) => s.title === name);
+  if (exact) return exact.title;
+
+  const ci = seriesList.find((s) => s.title.toLowerCase() === lower);
+  if (ci) return ci.title;
+
+  const slugMatch = seriesList.find((s) => s.slug === slug);
+  if (slugMatch) return slugMatch.title;
+
   return name;
 }
 
@@ -110,6 +143,12 @@ export async function createTil(
       categoryName = await resolveCategory(api, categoryName);
     }
 
+    // Resolve series name against cache
+    let seriesName = params.series_name;
+    if (seriesName) {
+      seriesName = await resolveSeries(api, seriesName);
+    }
+
     // Resolve tag names against cache
     let tagNames = params.tags;
     if (tagNames && tagNames.length > 0) {
@@ -126,12 +165,13 @@ export async function createTil(
         ...(params.lang && { lang: params.lang }),
         ...(tagNames && { tag_names: tagNames }),
         ...(categoryName && { category_name: categoryName }),
+        ...(seriesName && { series_name: seriesName }),
       },
     };
 
     const e = await api.post<EntryResponse>('/entries', body);
 
-    // Invalidate taxonomy cache — entry creation may have created new tags/categories
+    // Invalidate taxonomy cache — entry creation may have created new tags/categories/series
     taxonomyCache.invalidate();
 
     return [

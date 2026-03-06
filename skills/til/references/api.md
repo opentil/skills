@@ -22,6 +22,8 @@ All fields are nested under `entry`. Additionally, `tag_names` and `category_nam
 | `tag_names` | array | no | 1-3 lowercase tags, e.g. `["go", "concurrency"]` |
 | `category_name` | string | no | Category name (matched or created automatically). |
 | `category_id` | integer | no | Category ID (alternative to `category_name`). |
+| `series_name` | string | no | Series name (matched or created automatically). |
+| `series_id` | integer | no | Series ID (alternative to `series_name`). |
 | `published` | boolean | no | `false` for draft (default), `true` to publish immediately. |
 | `published_at` | datetime | no | ISO 8601 timestamp. Only relevant when publishing. |
 | `visibility` | string | no | `public` (default), `unlisted`, or `private` |

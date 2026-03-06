@@ -187,6 +187,7 @@ curl -X POST "https://opentil.ai/api/v1/entries" \
 | `slug` | string | no | Custom URL slug. Auto-generated from title if omitted. |
 | `visibility` | string | no | `public` (default), `unlisted`, or `private` |
 | `category_name` | string | no | Category name (matched or created automatically) |
+| `series_name` | string | no | Series name (matched or created automatically) |
 | `summary` | string | no | AI-generated summary for listing pages (max 500 chars) |
 
 **Management endpoints:**
@@ -545,6 +546,7 @@ Every TIL entry must follow these rules:
 - **Lang**: Detect from content. Chinese -> `zh-CN`, Traditional Chinese -> `zh-TW`, English -> `en`, Japanese -> `ja`, Korean -> `ko`.
 - **Category**: Before creating an entry, try loading the taxonomy cache (see [references/categories.md](references/categories.md)). Match the content to an existing category if a good fit exists. If no existing category fits, suggest a new concise category name. Include `category_name` in the creation request. If the cache/API fails, proceed without `category_name` -- never let a category lookup failure block entry creation.
 - **Tag matching**: When tags are specified, match each tag name against the taxonomy cache (exact → case-insensitive → slug). Use matched canonical names to avoid duplicates like "Rails" vs "rails". Unmatched names pass through as-is (server creates them). If cache fetch fails, use original names.
+- **Series**: If the entry belongs to a series, include `series_name` in the creation request. Match against the taxonomy cache (exact title → case-insensitive → slug) like categories. Unmatched names create a new series on the server. If cache fetch fails, pass the name through. Do not assign a series unless the user explicitly requests it or the content clearly belongs to an existing series.
 - **Summary**: 1-2 sentences, plain text (no markdown). Max 500 chars and must be shorter than the content body. Same language as content. Self-contained: the reader should understand the core takeaway from the summary alone. Be specific about what the reader will learn, not meta ("this article discusses..."). No first person, no meta-descriptions. Omit if the content is already very short (under ~200 chars) -- the excerpt fallback is sufficient.
 - **Anti-patterns** (avoid these):
   - *Command-only*: A single command or snippet with no explanation of when/why to use it. At minimum, explain the context or problem it solves.

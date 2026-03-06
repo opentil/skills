@@ -162,9 +162,15 @@ server.tool(
       .min(1)
       .optional()
       .describe('Category name (matched or created automatically)'),
+    series_name: z
+      .string()
+      .trim()
+      .min(1)
+      .optional()
+      .describe('Series name (matched or created automatically)'),
   },
   { destructiveHint: false, readOnlyHint: false, idempotentHint: false },
-  async ({ title, content, tags, visibility, published, summary, lang, category_name }) => {
+  async ({ title, content, tags, visibility, published, summary, lang, category_name, series_name }) => {
     const ctx = createApi();
     if (!ctx) return { content: [{ type: 'text' as const, text: NO_TOKEN_MESSAGE }] };
 
@@ -177,6 +183,7 @@ server.tool(
       summary,
       lang,
       category_name,
+      series_name,
     });
     return { content: [{ type: 'text' as const, text }] };
   },

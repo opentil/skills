@@ -20,9 +20,20 @@ export interface TagItem {
   taggings_count: number;
 }
 
+export interface SeriesItem {
+  id: string;
+  title: string;
+  slug: string;
+  description: string | null;
+  status: string;
+  entries_count: number;
+  position: number;
+}
+
 interface TaxonomyData {
   categories: CategoryItem[];
   tags: TagItem[];
+  series: SeriesItem[];
 }
 
 // Categories API returns { data: [...], meta: {} }
@@ -88,7 +99,7 @@ export async function fetchTaxonomy(
     if (is404) {
       try {
         const res = await api.get<CategoriesResponse>('/categories');
-        const data: TaxonomyData = { categories: res.data, tags: [] };
+        const data: TaxonomyData = { categories: res.data, tags: [], series: [] };
         taxonomyCache.set(data);
         return data;
       } catch (err) {
@@ -123,4 +134,12 @@ export async function fetchTags(
 ): Promise<TagItem[]> {
   const taxonomy = await fetchTaxonomy(api, force);
   return taxonomy.tags;
+}
+
+export async function fetchSeries(
+  api: ApiClient,
+  force = false,
+): Promise<SeriesItem[]> {
+  const taxonomy = await fetchTaxonomy(api, force);
+  return taxonomy.series || [];
 }

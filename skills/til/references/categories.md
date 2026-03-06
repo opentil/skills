@@ -18,6 +18,9 @@ Skill and MCP share the same taxonomy cache to avoid redundant API calls.
       ],
       "tags": [
         { "id": "456", "name": "rails", "slug": "rails", "taggings_count": 8 }
+      ],
+      "series": [
+        { "id": "789", "title": "Learning Rust", "slug": "learning-rust", "description": null, "status": "ongoing", "entries_count": 3, "position": 0 }
       ]
     }
   }
@@ -57,6 +60,18 @@ cat ~/.til/cache/taxonomy.json 2>/dev/null
 | Entry created successfully (may have created new tags/categories) | Delete cache file |
 | `/til categories --force` or `/til tags --force` | Delete cache file, then re-fetch |
 | TTL expired (10 min) | Next read auto-refreshes |
+
+## Series Matching (when creating entries)
+
+When assigning a series during entry creation:
+
+1. **Exact title match** → use that series
+2. **Case-insensitive match** → use that series (preserving original casing)
+3. **Slug match** → use that series
+4. **No match** → pass name in `series_name` field (server creates it)
+5. **Fetch fails** → pass name through (never block entry creation)
+
+Do not auto-assign series unless the user explicitly requests it or the content clearly belongs to an existing series.
 
 ## Category Matching (when creating entries)
 
